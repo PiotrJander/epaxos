@@ -22,6 +22,7 @@ const LOCALHOST: &str = "localhost";
 static REPLICA_INTERNAL_PORTS: &'static [u16] = &[10000, 10001, 10002, 10003, 10004];
 static REPLICA_EXTERNAL_PORTS: &'static [u16] = &[10000, 10001, 10002, 10003, 10004];
 
+#[derive(PartialEq, Eq, Hash)]
 struct InstanceId(u32);
 
 enum CommandState {
@@ -60,9 +61,9 @@ impl Epaxos {
 
             if i != id.0 {
                 let internal_client =
-                    grpc::Client::new_plain(LOCALHOST, REPLICA_INTERNAL_PORTS[i], Default::default()).unwrap();
-                let replica = InternalClient::with_client(grpc_replica1);
-                replicas.insert(InstanceId(i), replica)
+                    grpc::Client::new_plain(LOCALHOST, REPLICA_INTERNAL_PORTS[i as usize], Default::default()).unwrap();
+                let replica = InternalClient::with_client(Arc::new(internal_client));
+                replicas.insert(InstanceId(i), replica);
             }
         }
 
@@ -117,12 +118,12 @@ fn start_server(service: ServerServiceDefinition, port: u16) -> () {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let id = args[1].parse().unwrap();
-    let internal_port = REPLICA_INTERNAL_PORTS[id];
-    let external_port = REPLICA_EXTERNAL_PORTS[id];
+    let id: u32 = args[1].parse().unwrap();
+    let internal_port = REPLICA_INTERNAL_PORTS[id as usize];
+    let external_port = REPLICA_EXTERNAL_PORTS[id as usize];
 
     let epaxos = Epaxos::new(InstanceId(id));
-    start_server(InternalServer::new_service_def(epaxos), internal_port);
+    start_server(InternalServer::new_service_def(epaxos.clone()), internal_port);
     start_server(ExternalServer::new_service_def(epaxos.clone()), external_port);
 
     // Blocks the main thread forever
