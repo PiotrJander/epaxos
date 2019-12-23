@@ -4,14 +4,14 @@ syntax = "proto3";
 package epaxos;
 
 service Internal {
-    rpc pre_accept(Payload) returns (Payload);
-    rpc accept(Payload) returns (AcceptOKPayload);
-    rpc commit(Payload) returns (Empty);
+    rpc PreAccept(Payload) returns (Payload);
+    rpc Accept(Payload) returns (AcceptOKPayload);
+    rpc Commit(Payload) returns (Empty);
 }
 
 service External {
-    rpc write(WriteRequest) returns (WriteResponse);
-    rpc read(ReadRequest) returns (ReadResponse);
+    rpc Write(WriteRequest) returns (WriteResponse);
+    rpc Read(ReadRequest) returns (ReadResponse);
 }
 
 message Empty {}
@@ -38,21 +38,14 @@ message Instance {
     int32 number = 2;
 }
 
-message Command {
-    oneof command {
-        WriteRequest write_req = 1;
-        ReadRequest read_req = 2;
-    }
-}
-
 message Payload {
-    Command command = 1;
+    WriteRequest command = 1;  // TODO confirm that this is always a Write, never a Read
     int32 seq = 2;
     repeated Instance dependencies = 3;
     Instance instance = 4;
 }
 
 message AcceptOKPayload {
-    Command command = 1;
+    WriteRequest command = 1;
     Instance instance = 4;
 }

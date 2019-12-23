@@ -33,29 +33,29 @@ pub trait Internal {
 
 pub struct InternalClient {
     grpc_client: ::std::sync::Arc<::grpc::Client>,
-    method_pre_accept: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::Payload, super::epaxos::Payload>>,
-    method_accept: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::Payload, super::epaxos::AcceptOKPayload>>,
-    method_commit: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::Payload, super::epaxos::Empty>>,
+    method_PreAccept: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::Payload, super::epaxos::Payload>>,
+    method_Accept: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::Payload, super::epaxos::AcceptOKPayload>>,
+    method_Commit: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::Payload, super::epaxos::Empty>>,
 }
 
 impl ::grpc::ClientStub for InternalClient {
     fn with_client(grpc_client: ::std::sync::Arc<::grpc::Client>) -> Self {
         InternalClient {
             grpc_client: grpc_client,
-            method_pre_accept: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                name: "/epaxos.Internal/pre_accept".to_string(),
+            method_PreAccept: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
+                name: "/epaxos.Internal/PreAccept".to_string(),
                 streaming: ::grpc::rt::GrpcStreaming::Unary,
                 req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                 resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
             }),
-            method_accept: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                name: "/epaxos.Internal/accept".to_string(),
+            method_Accept: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
+                name: "/epaxos.Internal/Accept".to_string(),
                 streaming: ::grpc::rt::GrpcStreaming::Unary,
                 req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                 resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
             }),
-            method_commit: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                name: "/epaxos.Internal/commit".to_string(),
+            method_Commit: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
+                name: "/epaxos.Internal/Commit".to_string(),
                 streaming: ::grpc::rt::GrpcStreaming::Unary,
                 req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                 resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
@@ -66,15 +66,15 @@ impl ::grpc::ClientStub for InternalClient {
 
 impl Internal for InternalClient {
     fn pre_accept(&self, o: ::grpc::RequestOptions, p: super::epaxos::Payload) -> ::grpc::SingleResponse<super::epaxos::Payload> {
-        self.grpc_client.call_unary(o, p, self.method_pre_accept.clone())
+        self.grpc_client.call_unary(o, p, self.method_PreAccept.clone())
     }
 
     fn accept(&self, o: ::grpc::RequestOptions, p: super::epaxos::Payload) -> ::grpc::SingleResponse<super::epaxos::AcceptOKPayload> {
-        self.grpc_client.call_unary(o, p, self.method_accept.clone())
+        self.grpc_client.call_unary(o, p, self.method_Accept.clone())
     }
 
     fn commit(&self, o: ::grpc::RequestOptions, p: super::epaxos::Payload) -> ::grpc::SingleResponse<super::epaxos::Empty> {
-        self.grpc_client.call_unary(o, p, self.method_commit.clone())
+        self.grpc_client.call_unary(o, p, self.method_Commit.clone())
     }
 }
 
@@ -90,7 +90,7 @@ impl InternalServer {
             vec![
                 ::grpc::rt::ServerMethod::new(
                     ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                        name: "/epaxos.Internal/pre_accept".to_string(),
+                        name: "/epaxos.Internal/PreAccept".to_string(),
                         streaming: ::grpc::rt::GrpcStreaming::Unary,
                         req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                         resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
@@ -102,7 +102,7 @@ impl InternalServer {
                 ),
                 ::grpc::rt::ServerMethod::new(
                     ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                        name: "/epaxos.Internal/accept".to_string(),
+                        name: "/epaxos.Internal/Accept".to_string(),
                         streaming: ::grpc::rt::GrpcStreaming::Unary,
                         req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                         resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
@@ -114,7 +114,7 @@ impl InternalServer {
                 ),
                 ::grpc::rt::ServerMethod::new(
                     ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                        name: "/epaxos.Internal/commit".to_string(),
+                        name: "/epaxos.Internal/Commit".to_string(),
                         streaming: ::grpc::rt::GrpcStreaming::Unary,
                         req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                         resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
@@ -141,22 +141,22 @@ pub trait External {
 
 pub struct ExternalClient {
     grpc_client: ::std::sync::Arc<::grpc::Client>,
-    method_write: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::WriteRequest, super::epaxos::WriteResponse>>,
-    method_read: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::ReadRequest, super::epaxos::ReadResponse>>,
+    method_Write: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::WriteRequest, super::epaxos::WriteResponse>>,
+    method_Read: ::std::sync::Arc<::grpc::rt::MethodDescriptor<super::epaxos::ReadRequest, super::epaxos::ReadResponse>>,
 }
 
 impl ::grpc::ClientStub for ExternalClient {
     fn with_client(grpc_client: ::std::sync::Arc<::grpc::Client>) -> Self {
         ExternalClient {
             grpc_client: grpc_client,
-            method_write: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                name: "/epaxos.External/write".to_string(),
+            method_Write: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
+                name: "/epaxos.External/Write".to_string(),
                 streaming: ::grpc::rt::GrpcStreaming::Unary,
                 req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                 resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
             }),
-            method_read: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                name: "/epaxos.External/read".to_string(),
+            method_Read: ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
+                name: "/epaxos.External/Read".to_string(),
                 streaming: ::grpc::rt::GrpcStreaming::Unary,
                 req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                 resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
@@ -167,11 +167,11 @@ impl ::grpc::ClientStub for ExternalClient {
 
 impl External for ExternalClient {
     fn write(&self, o: ::grpc::RequestOptions, p: super::epaxos::WriteRequest) -> ::grpc::SingleResponse<super::epaxos::WriteResponse> {
-        self.grpc_client.call_unary(o, p, self.method_write.clone())
+        self.grpc_client.call_unary(o, p, self.method_Write.clone())
     }
 
     fn read(&self, o: ::grpc::RequestOptions, p: super::epaxos::ReadRequest) -> ::grpc::SingleResponse<super::epaxos::ReadResponse> {
-        self.grpc_client.call_unary(o, p, self.method_read.clone())
+        self.grpc_client.call_unary(o, p, self.method_Read.clone())
     }
 }
 
@@ -187,7 +187,7 @@ impl ExternalServer {
             vec![
                 ::grpc::rt::ServerMethod::new(
                     ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                        name: "/epaxos.External/write".to_string(),
+                        name: "/epaxos.External/Write".to_string(),
                         streaming: ::grpc::rt::GrpcStreaming::Unary,
                         req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                         resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
@@ -199,7 +199,7 @@ impl ExternalServer {
                 ),
                 ::grpc::rt::ServerMethod::new(
                     ::std::sync::Arc::new(::grpc::rt::MethodDescriptor {
-                        name: "/epaxos.External/read".to_string(),
+                        name: "/epaxos.External/Read".to_string(),
                         streaming: ::grpc::rt::GrpcStreaming::Unary,
                         req_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),
                         resp_marshaller: Box::new(::grpc::protobuf::MarshallerProtobuf),

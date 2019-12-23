@@ -1047,301 +1047,9 @@ impl ::protobuf::reflect::ProtobufValue for Instance {
 }
 
 #[derive(PartialEq,Clone,Default)]
-pub struct Command {
-    // message oneof groups
-    pub command: ::std::option::Option<Command_oneof_command>,
-    // special fields
-    pub unknown_fields: ::protobuf::UnknownFields,
-    pub cached_size: ::protobuf::CachedSize,
-}
-
-impl<'a> ::std::default::Default for &'a Command {
-    fn default() -> &'a Command {
-        <Command as ::protobuf::Message>::default_instance()
-    }
-}
-
-#[derive(Clone,PartialEq,Debug)]
-pub enum Command_oneof_command {
-    write_req(WriteRequest),
-    read_req(ReadRequest),
-}
-
-impl Command {
-    pub fn new() -> Command {
-        ::std::default::Default::default()
-    }
-
-    // .epaxos.WriteRequest write_req = 1;
-
-
-    pub fn get_write_req(&self) -> &WriteRequest {
-        match self.command {
-            ::std::option::Option::Some(Command_oneof_command::write_req(ref v)) => v,
-            _ => WriteRequest::default_instance(),
-        }
-    }
-    pub fn clear_write_req(&mut self) {
-        self.command = ::std::option::Option::None;
-    }
-
-    pub fn has_write_req(&self) -> bool {
-        match self.command {
-            ::std::option::Option::Some(Command_oneof_command::write_req(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_write_req(&mut self, v: WriteRequest) {
-        self.command = ::std::option::Option::Some(Command_oneof_command::write_req(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_write_req(&mut self) -> &mut WriteRequest {
-        if let ::std::option::Option::Some(Command_oneof_command::write_req(_)) = self.command {
-        } else {
-            self.command = ::std::option::Option::Some(Command_oneof_command::write_req(WriteRequest::new()));
-        }
-        match self.command {
-            ::std::option::Option::Some(Command_oneof_command::write_req(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_write_req(&mut self) -> WriteRequest {
-        if self.has_write_req() {
-            match self.command.take() {
-                ::std::option::Option::Some(Command_oneof_command::write_req(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            WriteRequest::new()
-        }
-    }
-
-    // .epaxos.ReadRequest read_req = 2;
-
-
-    pub fn get_read_req(&self) -> &ReadRequest {
-        match self.command {
-            ::std::option::Option::Some(Command_oneof_command::read_req(ref v)) => v,
-            _ => ReadRequest::default_instance(),
-        }
-    }
-    pub fn clear_read_req(&mut self) {
-        self.command = ::std::option::Option::None;
-    }
-
-    pub fn has_read_req(&self) -> bool {
-        match self.command {
-            ::std::option::Option::Some(Command_oneof_command::read_req(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_read_req(&mut self, v: ReadRequest) {
-        self.command = ::std::option::Option::Some(Command_oneof_command::read_req(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_read_req(&mut self) -> &mut ReadRequest {
-        if let ::std::option::Option::Some(Command_oneof_command::read_req(_)) = self.command {
-        } else {
-            self.command = ::std::option::Option::Some(Command_oneof_command::read_req(ReadRequest::new()));
-        }
-        match self.command {
-            ::std::option::Option::Some(Command_oneof_command::read_req(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_read_req(&mut self) -> ReadRequest {
-        if self.has_read_req() {
-            match self.command.take() {
-                ::std::option::Option::Some(Command_oneof_command::read_req(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            ReadRequest::new()
-        }
-    }
-}
-
-impl ::protobuf::Message for Command {
-    fn is_initialized(&self) -> bool {
-        if let Some(Command_oneof_command::write_req(ref v)) = self.command {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Command_oneof_command::read_req(ref v)) = self.command {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        while !is.eof()? {
-            let (field_number, wire_type) = is.read_tag_unpack()?;
-            match field_number {
-                1 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.command = ::std::option::Option::Some(Command_oneof_command::write_req(is.read_message()?));
-                },
-                2 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.command = ::std::option::Option::Some(Command_oneof_command::read_req(is.read_message()?));
-                },
-                _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
-            };
-        }
-        ::std::result::Result::Ok(())
-    }
-
-    // Compute sizes of nested messages
-    #[allow(unused_variables)]
-    fn compute_size(&self) -> u32 {
-        let mut my_size = 0;
-        if let ::std::option::Option::Some(ref v) = self.command {
-            match v {
-                &Command_oneof_command::write_req(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Command_oneof_command::read_req(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-            };
-        }
-        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
-        self.cached_size.set(my_size);
-        my_size
-    }
-
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if let ::std::option::Option::Some(ref v) = self.command {
-            match v {
-                &Command_oneof_command::write_req(ref v) => {
-                    os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Command_oneof_command::read_req(ref v) => {
-                    os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-            };
-        }
-        os.write_unknown_fields(self.get_unknown_fields())?;
-        ::std::result::Result::Ok(())
-    }
-
-    fn get_cached_size(&self) -> u32 {
-        self.cached_size.get()
-    }
-
-    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
-        &self.unknown_fields
-    }
-
-    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
-        &mut self.unknown_fields
-    }
-
-    fn as_any(&self) -> &dyn (::std::any::Any) {
-        self as &dyn (::std::any::Any)
-    }
-    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
-        self as &mut dyn (::std::any::Any)
-    }
-    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
-        self
-    }
-
-    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
-        Self::descriptor_static()
-    }
-
-    fn new() -> Command {
-        Command::new()
-    }
-
-    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
-        unsafe {
-            descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, WriteRequest>(
-                    "write_req",
-                    Command::has_write_req,
-                    Command::get_write_req,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, ReadRequest>(
-                    "read_req",
-                    Command::has_read_req,
-                    Command::get_read_req,
-                ));
-                ::protobuf::reflect::MessageDescriptor::new::<Command>(
-                    "Command",
-                    fields,
-                    file_descriptor_proto()
-                )
-            })
-        }
-    }
-
-    fn default_instance() -> &'static Command {
-        static mut instance: ::protobuf::lazy::Lazy<Command> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const Command,
-        };
-        unsafe {
-            instance.get(Command::new)
-        }
-    }
-}
-
-impl ::protobuf::Clear for Command {
-    fn clear(&mut self) {
-        self.command = ::std::option::Option::None;
-        self.command = ::std::option::Option::None;
-        self.unknown_fields.clear();
-    }
-}
-
-impl ::std::fmt::Debug for Command {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        ::protobuf::text_format::fmt(self, f)
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for Command {
-    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
-        ::protobuf::reflect::ProtobufValueRef::Message(self)
-    }
-}
-
-#[derive(PartialEq,Clone,Default)]
 pub struct Payload {
     // message fields
-    pub command: ::protobuf::SingularPtrField<Command>,
+    pub command: ::protobuf::SingularPtrField<WriteRequest>,
     pub seq: i32,
     pub dependencies: ::protobuf::RepeatedField<Instance>,
     pub instance: ::protobuf::SingularPtrField<Instance>,
@@ -1361,11 +1069,11 @@ impl Payload {
         ::std::default::Default::default()
     }
 
-    // .epaxos.Command command = 1;
+    // .epaxos.WriteRequest command = 1;
 
 
-    pub fn get_command(&self) -> &Command {
-        self.command.as_ref().unwrap_or_else(|| Command::default_instance())
+    pub fn get_command(&self) -> &WriteRequest {
+        self.command.as_ref().unwrap_or_else(|| WriteRequest::default_instance())
     }
     pub fn clear_command(&mut self) {
         self.command.clear();
@@ -1376,13 +1084,13 @@ impl Payload {
     }
 
     // Param is passed by value, moved
-    pub fn set_command(&mut self, v: Command) {
+    pub fn set_command(&mut self, v: WriteRequest) {
         self.command = ::protobuf::SingularPtrField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_command(&mut self) -> &mut Command {
+    pub fn mut_command(&mut self) -> &mut WriteRequest {
         if self.command.is_none() {
             self.command.set_default();
         }
@@ -1390,8 +1098,8 @@ impl Payload {
     }
 
     // Take field
-    pub fn take_command(&mut self) -> Command {
-        self.command.take().unwrap_or_else(|| Command::new())
+    pub fn take_command(&mut self) -> WriteRequest {
+        self.command.take().unwrap_or_else(|| WriteRequest::new())
     }
 
     // int32 seq = 2;
@@ -1601,7 +1309,7 @@ impl ::protobuf::Message for Payload {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Command>>(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<WriteRequest>>(
                     "command",
                     |m: &Payload| { &m.command },
                     |m: &mut Payload| { &mut m.command },
@@ -1666,7 +1374,7 @@ impl ::protobuf::reflect::ProtobufValue for Payload {
 #[derive(PartialEq,Clone,Default)]
 pub struct AcceptOKPayload {
     // message fields
-    pub command: ::protobuf::SingularPtrField<Command>,
+    pub command: ::protobuf::SingularPtrField<WriteRequest>,
     pub instance: ::protobuf::SingularPtrField<Instance>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -1684,11 +1392,11 @@ impl AcceptOKPayload {
         ::std::default::Default::default()
     }
 
-    // .epaxos.Command command = 1;
+    // .epaxos.WriteRequest command = 1;
 
 
-    pub fn get_command(&self) -> &Command {
-        self.command.as_ref().unwrap_or_else(|| Command::default_instance())
+    pub fn get_command(&self) -> &WriteRequest {
+        self.command.as_ref().unwrap_or_else(|| WriteRequest::default_instance())
     }
     pub fn clear_command(&mut self) {
         self.command.clear();
@@ -1699,13 +1407,13 @@ impl AcceptOKPayload {
     }
 
     // Param is passed by value, moved
-    pub fn set_command(&mut self, v: Command) {
+    pub fn set_command(&mut self, v: WriteRequest) {
         self.command = ::protobuf::SingularPtrField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_command(&mut self) -> &mut Command {
+    pub fn mut_command(&mut self) -> &mut WriteRequest {
         if self.command.is_none() {
             self.command.set_default();
         }
@@ -1713,8 +1421,8 @@ impl AcceptOKPayload {
     }
 
     // Take field
-    pub fn take_command(&mut self) -> Command {
-        self.command.take().unwrap_or_else(|| Command::new())
+    pub fn take_command(&mut self) -> WriteRequest {
+        self.command.take().unwrap_or_else(|| WriteRequest::new())
     }
 
     // .epaxos.Instance instance = 4;
@@ -1854,7 +1562,7 @@ impl ::protobuf::Message for AcceptOKPayload {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Command>>(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<WriteRequest>>(
                     "command",
                     |m: &AcceptOKPayload| { &m.command },
                     |m: &mut AcceptOKPayload| { &mut m.command },
@@ -1912,21 +1620,19 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x20\x01(\tR\x03key\"$\n\x0cReadResponse\x12\x14\n\x05value\x18\x01\x20\
     \x01(\x05R\x05value\"<\n\x08Instance\x12\x18\n\x07replica\x18\x01\x20\
     \x01(\x05R\x07replica\x12\x16\n\x06number\x18\x02\x20\x01(\x05R\x06numbe\
-    r\"{\n\x07Command\x123\n\twrite_req\x18\x01\x20\x01(\x0b2\x14.epaxos.Wri\
-    teRequestH\0R\x08writeReq\x120\n\x08read_req\x18\x02\x20\x01(\x0b2\x13.e\
-    paxos.ReadRequestH\0R\x07readReqB\t\n\x07command\"\xaa\x01\n\x07Payload\
-    \x12)\n\x07command\x18\x01\x20\x01(\x0b2\x0f.epaxos.CommandR\x07command\
-    \x12\x10\n\x03seq\x18\x02\x20\x01(\x05R\x03seq\x124\n\x0cdependencies\
-    \x18\x03\x20\x03(\x0b2\x10.epaxos.InstanceR\x0cdependencies\x12,\n\x08in\
-    stance\x18\x04\x20\x01(\x0b2\x10.epaxos.InstanceR\x08instance\"j\n\x0fAc\
-    ceptOKPayload\x12)\n\x07command\x18\x01\x20\x01(\x0b2\x0f.epaxos.Command\
-    R\x07command\x12,\n\x08instance\x18\x04\x20\x01(\x0b2\x10.epaxos.Instanc\
-    eR\x08instance2\x98\x01\n\x08Internal\x12.\n\npre_accept\x12\x0f.epaxos.\
-    Payload\x1a\x0f.epaxos.Payload\x122\n\x06accept\x12\x0f.epaxos.Payload\
-    \x1a\x17.epaxos.AcceptOKPayload\x12(\n\x06commit\x12\x0f.epaxos.Payload\
-    \x1a\r.epaxos.Empty2s\n\x08External\x124\n\x05write\x12\x14.epaxos.Write\
-    Request\x1a\x15.epaxos.WriteResponse\x121\n\x04read\x12\x13.epaxos.ReadR\
-    equest\x1a\x14.epaxos.ReadResponseb\x06proto3\
+    r\"\xaf\x01\n\x07Payload\x12.\n\x07command\x18\x01\x20\x01(\x0b2\x14.epa\
+    xos.WriteRequestR\x07command\x12\x10\n\x03seq\x18\x02\x20\x01(\x05R\x03s\
+    eq\x124\n\x0cdependencies\x18\x03\x20\x03(\x0b2\x10.epaxos.InstanceR\x0c\
+    dependencies\x12,\n\x08instance\x18\x04\x20\x01(\x0b2\x10.epaxos.Instanc\
+    eR\x08instance\"o\n\x0fAcceptOKPayload\x12.\n\x07command\x18\x01\x20\x01\
+    (\x0b2\x14.epaxos.WriteRequestR\x07command\x12,\n\x08instance\x18\x04\
+    \x20\x01(\x0b2\x10.epaxos.InstanceR\x08instance2\x97\x01\n\x08Internal\
+    \x12-\n\tPreAccept\x12\x0f.epaxos.Payload\x1a\x0f.epaxos.Payload\x122\n\
+    \x06Accept\x12\x0f.epaxos.Payload\x1a\x17.epaxos.AcceptOKPayload\x12(\n\
+    \x06Commit\x12\x0f.epaxos.Payload\x1a\r.epaxos.Empty2s\n\x08External\x12\
+    4\n\x05Write\x12\x14.epaxos.WriteRequest\x1a\x15.epaxos.WriteResponse\
+    \x121\n\x04Read\x12\x13.epaxos.ReadRequest\x1a\x14.epaxos.ReadResponseb\
+    \x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
