@@ -1,18 +1,20 @@
 syntax = "proto3";
-import "google/protobuf/empty.proto";
+//import "google/protobuf/empty.proto";
 
 package epaxos;
 
 service Internal {
     rpc pre_accept(Payload) returns (Payload);
     rpc accept(Payload) returns (AcceptOKPayload);
-    rpc commit(Payload) returns (google.protobuf.Empty);
+    rpc commit(Payload) returns (Empty);
 }
 
 service External {
     rpc write(WriteRequest) returns (WriteResponse);
     rpc read(ReadRequest) returns (ReadResponse);
 }
+
+message Empty {}
 
 message WriteRequest {
     string key = 1;
