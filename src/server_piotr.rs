@@ -45,14 +45,14 @@ struct Instance {
     state: CommandState
 }
 
-// TODO do we risk deadlocks by having mutexes and cloning?
+// TODO always acquire in the same order and acquire the first mutex to have atomicity
 #[derive(Clone)]
 struct Epaxos {
     id: ReplicaId,
     //    store: Arc<Mutex<HashMap<String, i32>>>,
     commands: Arc<Mutex<Vec<Vec<Instance>>>>,
 //    instance_number: Arc<Mutex<u32>>, // maybe not needed due to using vectors
-    replicas: Arc<Mutex<HashMap<ReplicaId, InternalClient>>>,
+    replicas: Arc<Mutex<HashMap<ReplicaId, InternalClient>>>
 }
 
 impl Epaxos {
@@ -76,7 +76,7 @@ impl Epaxos {
         return Epaxos {
             id,
             commands: Arc::new(Mutex::new(commands)),
-            replicas: Arc::new(Mutex::new(replicas)),
+            replicas: Arc::new(Mutex::new(replicas))
         };
     }
 
@@ -87,9 +87,9 @@ impl Epaxos {
     fn find_interference(&self, key: &String) -> Vec<InstanceRef> {
         let mut acc = Vec::new();
         let commands = self.commands.lock().unwrap();
-        for q in 0..commands.len() {
-            for j in 0..commands[q].len() {
-                if commands[q][j].key == *key {
+        for (q, row) in commands.iter().enumerate() {
+            for (j, instance) in row.iter().enumerate() {
+                if instance.key == *key {
                     acc.push(InstanceRef { replica: ReplicaId(q), slot: j })
                 }
             }
