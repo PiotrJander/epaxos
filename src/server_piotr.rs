@@ -29,12 +29,12 @@ struct ReplicaId(usize);
 enum CommandState {
     PreAccepted,
     Accepted,
-    Committed
+    Committed,
 }
 
 struct InstanceRef {
     replica: ReplicaId,
-    slot: usize
+    slot: usize,
 }
 
 struct Instance {
@@ -42,23 +42,23 @@ struct Instance {
     value: i32,
     seq: usize,
     dependencies: Vec<InstanceRef>,
-    state: CommandState
+    state: CommandState,
 }
+
+type Commands = Vec<Vec<Instance>>;
 
 // TODO always acquire in the same order and acquire the first mutex to have atomicity
 #[derive(Clone)]
 struct Epaxos {
     id: ReplicaId,
     //    store: Arc<Mutex<HashMap<String, i32>>>,
-    commands: Arc<Mutex<Vec<Vec<Instance>>>>,
-//    instance_number: Arc<Mutex<u32>>, // maybe not needed due to using vectors
-    replicas: Arc<Mutex<HashMap<ReplicaId, InternalClient>>>
+    commands: Arc<Mutex<Commands>>,
+    //    instance_number: Arc<Mutex<u32>>, // maybe not needed due to using vectors
+    replicas: Arc<Mutex<HashMap<ReplicaId, InternalClient>>>,
 }
 
 impl Epaxos {
-
     fn new(id: ReplicaId) -> Epaxos {
-
         let mut commands = Vec::new();
         let mut replicas = HashMap::new();
 
@@ -76,54 +76,79 @@ impl Epaxos {
         return Epaxos {
             id,
             commands: Arc::new(Mutex::new(commands)),
-            replicas: Arc::new(Mutex::new(replicas))
+            replicas: Arc::new(Mutex::new(replicas)),
         };
     }
 
-    // FIXME we only record write commands - is this okay?
-    // FIXME is this correct?
-    // Piotr to Pi: your `find_interference` was wrong because it only considered
-    // the current replica's row.
-    fn find_interference(&self, key: &String) -> Vec<InstanceRef> {
-        let mut acc = Vec::new();
-        let commands = self.commands.lock().unwrap();
-        for (q, row) in commands.iter().enumerate() {
-            for (j, instance) in row.iter().enumerate() {
-                if instance.key == *key {
-                    acc.push(InstanceRef { replica: ReplicaId(q), slot: j })
-                }
-            }
-        }
-        acc
+    fn pre_accept_(&self, p: Payload) -> Payload {
+        unimplemented!()
     }
 
-    // FIXME how can we avoid acquiring locks on mutexes all the time?
-    fn find_seq(&self, deps: &Vec<InstanceRef>) -> usize {
-        let mut acc = 0;
-        for dep in deps {
-            let commands = self.commands.lock().unwrap();
-            let instance = &commands[dep.replica.0][dep.slot];
-            acc = cmp::max(acc, instance.seq)
-        }
-        acc + 1
+    fn accept_(&self, p: Payload) -> AcceptOKPayload {
+        unimplemented!()
     }
 
-    fn consensus(&self, write_req: &WriteRequest) {
-        // TODO how to guarantee that the below action are atomic?
-        let deps = self.find_interference(&write_req.key);
-        let seq = self.find_seq(&deps);
+    fn commit_(&self, p: Payload) -> () {
+        unimplemented!()
+    }
+
+    fn fast_quorum(&self) -> Vec<ReplicaId> {
+        unimplemented!()
+    }
+
+    fn establish_ordering_constraints(&self, key: String, value: i32) {
         let mut commands = self.commands.lock().unwrap();
+        let dependencies = find_interference(&commands, &key);
+        let seq = find_next_seq(&commands, &dependencies);
         commands[self.id.0].push(Instance {
-            key: write_req.key.clone(),
-            value: write_req.value,
+            key,
+            value,
             seq,
-            dependencies: deps,
-            state: PreAccepted
-        })
-        // end TODO
+            dependencies,
+            state: PreAccepted,
+        });
+    }
+
+    fn write_(&self, p: WriteRequest) -> WriteResponse {
+        self.establish_ordering_constraints(p.key, p.value);
 
         // TODO send internal messages and continue
+
+        new_write_response(true)
     }
+
+    fn read_(&self, p: ReadRequest) -> ReadResponse {
+        unimplemented!()
+    }
+}
+
+fn new_write_response(committed: bool) -> WriteResponse {
+    let mut r = WriteResponse::new();
+    r.set_commit(committed);
+    r
+}
+
+// FIXME we only record write commands - is this okay?
+// FIXME is this correct?
+fn find_interference(commands: &Commands, key: &String) -> Vec<InstanceRef> {
+    let mut acc = Vec::new();
+    for (q, row) in commands.iter().enumerate() {
+        for (j, instance) in row.iter().enumerate() {
+            if instance.key == *key {
+                acc.push(InstanceRef { replica: ReplicaId(q), slot: j })
+            }
+        }
+    }
+    acc
+}
+
+fn find_next_seq(commands: &Commands, deps: &Vec<InstanceRef>) -> usize {
+    let mut acc = 0;
+    for dep in deps {
+        let instance = &commands[dep.replica.0][dep.slot];
+        acc = cmp::max(acc, instance.seq)
+    }
+    acc + 1
 }
 
 impl Internal for Epaxos {
@@ -142,10 +167,7 @@ impl Internal for Epaxos {
 
 impl External for Epaxos {
     fn write(&self, o: RequestOptions, p: WriteRequest) -> SingleResponse<WriteResponse> {
-        self.consensus(&p);
-        let mut r = WriteResponse::new();
-        r.set_commit(true);
-        grpc::SingleResponse::completed(r)
+        grpc::SingleResponse::completed(self.write_(p))
     }
 
     fn read(&self, o: RequestOptions, p: ReadRequest) -> SingleResponse<ReadResponse> {

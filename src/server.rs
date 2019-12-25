@@ -32,6 +32,27 @@ enum State {
     Committed,
 }
 
+//m1, m2
+//t1, t2
+//
+//t1:
+//    m1.lock
+//    m2.lock
+//
+//t2:
+//    m1.lock
+//    m2.lock
+//
+//t1: m1.lock
+//t2: m1.lock
+//t1: m2.lock <- blocked
+//t2: m2.release
+//t1: m1.release
+//t1: m2.lock
+//t2: m2.lock
+
+
+
 #[derive(Clone)]
 struct Epaxos {
     // In grpc, parameters in service are immutable.
@@ -95,11 +116,12 @@ impl Epaxos {
     fn consensus(&self, write_req: &WriteRequest) -> bool {
         println!("===============");
         println!("Starting consensus");
+        // FIXME you're gonna run into deadlocks unless you acquire locks in a fixed order
         let slot = *self.instance_number.lock().unwrap();
         let mut payload = Payload::new();
         let mut instance = Instance::new();
         instance.set_replica(self.id.0 as u32);
-        instance.set_slot(*self.instance_number.lock().unwrap());
+        instance.set_slot(slot);  // FIXME it seems to me that you would deadlock here due to recursive locking; use `slot` instead
         payload.set_instance(instance);
         payload.set_write_req(write_req.clone());
         let mut interf = self.find_interference(write_req.get_key().to_owned());
@@ -113,7 +135,9 @@ impl Epaxos {
             deps: interf.clone(),
             state: State::PreAccepted,
         };
-        (*self.cmds.lock().unwrap())[self.id.0].insert(slot as usize, log_entry.clone());
+        (*self.cmds.lock().unwrap())[self.id.0].insert(slot as usize, log_entry.clone());  // FIXME careful not to lock cmds again until the end of scope
+        // PIOTR got here
+
         let mut fast_quorum = 1; // Leader votes for itself
         let mut slow_path = false;
         let mut fast_path = false;
@@ -252,12 +276,12 @@ impl Epaxos {
                 seq = interf_seq;
             }
         }
-        return seq;  // FIXME should be +1 here; no need to return
+        return seq;
     }
 
     fn find_interference(&self, key: String) -> protobuf::RepeatedField<Instance> {
         println!("Finding interf");
-        let mut interf = protobuf::RepeatedField::new();  // FIXME use Vec panda!
+        let mut interf = protobuf::RepeatedField::new();
         for replica in 0..REPLICAS_NUM {
             for (slot, log_entry) in (*self.cmds.lock().unwrap())[replica].iter() {
                 if log_entry.key == key {
@@ -269,7 +293,7 @@ impl Epaxos {
             }
         }
         println!("Found interf : {:?}", interf);
-        return interf;  // FIXME panda
+        interf
     }
 
     fn execute(&self) {
