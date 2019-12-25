@@ -26,15 +26,44 @@ static REPLICA_EXTERNAL_PORTS: &'static [u16] = &[10010, 10011, 10012, 10013, 10
 #[derive(PartialEq, Eq, Hash, Clone)]
 struct ReplicaId(usize);
 
-enum CommandState {
-    PreAccepted,
-    Accepted,
-    Committed,
+struct WriteRequest {
+    key: String,
+    value: i32
+}
+
+struct WriteResponse {
+    committed: bool
+}
+
+struct ReadRequest {
+    key: String
+}
+
+struct ReadResponse {
+    value: i32
 }
 
 struct InstanceRef {
     replica: ReplicaId,
     slot: usize,
+}
+
+struct Payload {
+    command: WriteRequest,
+    seq: usize,
+    dependencies: Vec<InstanceRef>,
+    instance: InstanceRef
+}
+
+struct AcceptOKPayload {
+    command: WriteRequest,
+    instance: InstanceRef
+}
+
+enum CommandState {
+    PreAccepted,
+    Accepted,
+    Committed,
 }
 
 struct Instance {
@@ -96,10 +125,11 @@ impl Epaxos {
         unimplemented!()
     }
 
-    fn establish_ordering_constraints(&self, key: String, value: i32) {
+    fn establish_ordering_constraints1(&self, key: String, value: i32) {
         let mut commands = self.commands.lock().unwrap();
         let dependencies = find_interference(&commands, &key);
         let seq = find_next_seq(&commands, &dependencies);
+        let instance_number = commands[self.id.0].len();
         commands[self.id.0].push(Instance {
             key,
             value,
@@ -107,25 +137,22 @@ impl Epaxos {
             dependencies,
             state: PreAccepted,
         });
+        // TODO maybe duplicate gRPC data structures in rust and split into many files
+//        let pre_accept_payload = Payload {}
+        unimplemented!()
     }
 
     fn write_(&self, p: WriteRequest) -> WriteResponse {
-        self.establish_ordering_constraints(p.key, p.value);
+        self.establish_ordering_constraints1(p.key, p.value);
 
         // TODO send internal messages and continue
 
-        new_write_response(true)
+        unimplemented!()
     }
 
     fn read_(&self, p: ReadRequest) -> ReadResponse {
         unimplemented!()
     }
-}
-
-fn new_write_response(committed: bool) -> WriteResponse {
-    let mut r = WriteResponse::new();
-    r.set_commit(committed);
-    r
 }
 
 // FIXME we only record write commands - is this okay?
@@ -151,30 +178,6 @@ fn find_next_seq(commands: &Commands, deps: &Vec<InstanceRef>) -> usize {
     acc + 1
 }
 
-impl Internal for Epaxos {
-    fn pre_accept(&self, o: RequestOptions, p: Payload) -> SingleResponse<Payload> {
-        unimplemented!()
-    }
-
-    fn accept(&self, o: RequestOptions, p: Payload) -> SingleResponse<AcceptOKPayload> {
-        unimplemented!()
-    }
-
-    fn commit(&self, o: RequestOptions, p: Payload) -> SingleResponse<Empty> {
-        unimplemented!()
-    }
-}
-
-impl External for Epaxos {
-    fn write(&self, o: RequestOptions, p: WriteRequest) -> SingleResponse<WriteResponse> {
-        grpc::SingleResponse::completed(self.write_(p))
-    }
-
-    fn read(&self, o: RequestOptions, p: ReadRequest) -> SingleResponse<ReadResponse> {
-        unimplemented!()
-    }
-}
-
 fn start_server(service: ServerServiceDefinition, port: u16) -> () {
     let mut server_builder = grpc::ServerBuilder::new_plain();
     server_builder.add_service(service);
@@ -186,13 +189,13 @@ fn start_server(service: ServerServiceDefinition, port: u16) -> () {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let id = args[1].parse().unwrap();
+    let id: usize = args[1].parse().unwrap();
     let internal_port = REPLICA_INTERNAL_PORTS[id];
     let external_port = REPLICA_EXTERNAL_PORTS[id];
 
-    let epaxos = Epaxos::new(ReplicaId(id));
-    start_server(InternalServer::new_service_def(epaxos.clone()), internal_port);
-    start_server(ExternalServer::new_service_def(epaxos.clone()), external_port);
+//    let epaxos = Epaxos::new(ReplicaId(id));
+//    start_server(InternalServer::new_service_def(epaxos.clone()), internal_port);
+//    start_server(ExternalServer::new_service_def(epaxos.clone()), external_port);
 
     // Blocks the main thread forever
     loop {

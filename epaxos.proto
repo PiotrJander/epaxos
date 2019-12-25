@@ -1,5 +1,4 @@
 syntax = "proto3";
-//import "google/protobuf/empty.proto";
 
 package epaxos;
 
@@ -34,13 +33,13 @@ message ReadResponse {
 }
 
 message Instance {
-    int32 replica = 1;
-    int32 number = 2;
+    uint32 replica = 1;
+    uint32 number = 2;
 }
 
 message Payload {
     WriteRequest command = 1;  // TODO confirm that this is always a Write, never a Read
-    int32 seq = 2;
+    uint32 seq = 2;
     repeated Instance dependencies = 3;
     Instance instance = 4;
 }

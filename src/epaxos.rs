@@ -852,8 +852,8 @@ impl ::protobuf::reflect::ProtobufValue for ReadResponse {
 #[derive(PartialEq,Clone,Default)]
 pub struct Instance {
     // message fields
-    pub replica: i32,
-    pub number: i32,
+    pub replica: u32,
+    pub number: u32,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -870,10 +870,10 @@ impl Instance {
         ::std::default::Default::default()
     }
 
-    // int32 replica = 1;
+    // uint32 replica = 1;
 
 
-    pub fn get_replica(&self) -> i32 {
+    pub fn get_replica(&self) -> u32 {
         self.replica
     }
     pub fn clear_replica(&mut self) {
@@ -881,14 +881,14 @@ impl Instance {
     }
 
     // Param is passed by value, moved
-    pub fn set_replica(&mut self, v: i32) {
+    pub fn set_replica(&mut self, v: u32) {
         self.replica = v;
     }
 
-    // int32 number = 2;
+    // uint32 number = 2;
 
 
-    pub fn get_number(&self) -> i32 {
+    pub fn get_number(&self) -> u32 {
         self.number
     }
     pub fn clear_number(&mut self) {
@@ -896,7 +896,7 @@ impl Instance {
     }
 
     // Param is passed by value, moved
-    pub fn set_number(&mut self, v: i32) {
+    pub fn set_number(&mut self, v: u32) {
         self.number = v;
     }
 }
@@ -914,14 +914,14 @@ impl ::protobuf::Message for Instance {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    let tmp = is.read_int32()?;
+                    let tmp = is.read_uint32()?;
                     self.replica = tmp;
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    let tmp = is.read_int32()?;
+                    let tmp = is.read_uint32()?;
                     self.number = tmp;
                 },
                 _ => {
@@ -949,10 +949,10 @@ impl ::protobuf::Message for Instance {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
         if self.replica != 0 {
-            os.write_int32(1, self.replica)?;
+            os.write_uint32(1, self.replica)?;
         }
         if self.number != 0 {
-            os.write_int32(2, self.number)?;
+            os.write_uint32(2, self.number)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -996,12 +996,12 @@ impl ::protobuf::Message for Instance {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "replica",
                     |m: &Instance| { &m.replica },
                     |m: &mut Instance| { &mut m.replica },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "number",
                     |m: &Instance| { &m.number },
                     |m: &mut Instance| { &mut m.number },
@@ -1050,7 +1050,7 @@ impl ::protobuf::reflect::ProtobufValue for Instance {
 pub struct Payload {
     // message fields
     pub command: ::protobuf::SingularPtrField<WriteRequest>,
-    pub seq: i32,
+    pub seq: u32,
     pub dependencies: ::protobuf::RepeatedField<Instance>,
     pub instance: ::protobuf::SingularPtrField<Instance>,
     // special fields
@@ -1102,10 +1102,10 @@ impl Payload {
         self.command.take().unwrap_or_else(|| WriteRequest::new())
     }
 
-    // int32 seq = 2;
+    // uint32 seq = 2;
 
 
-    pub fn get_seq(&self) -> i32 {
+    pub fn get_seq(&self) -> u32 {
         self.seq
     }
     pub fn clear_seq(&mut self) {
@@ -1113,7 +1113,7 @@ impl Payload {
     }
 
     // Param is passed by value, moved
-    pub fn set_seq(&mut self, v: i32) {
+    pub fn set_seq(&mut self, v: u32) {
         self.seq = v;
     }
 
@@ -1207,7 +1207,7 @@ impl ::protobuf::Message for Payload {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    let tmp = is.read_int32()?;
+                    let tmp = is.read_uint32()?;
                     self.seq = tmp;
                 },
                 3 => {
@@ -1255,7 +1255,7 @@ impl ::protobuf::Message for Payload {
             v.write_to_with_cached_sizes(os)?;
         }
         if self.seq != 0 {
-            os.write_int32(2, self.seq)?;
+            os.write_uint32(2, self.seq)?;
         }
         for v in &self.dependencies {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
@@ -1314,7 +1314,7 @@ impl ::protobuf::Message for Payload {
                     |m: &Payload| { &m.command },
                     |m: &mut Payload| { &mut m.command },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "seq",
                     |m: &Payload| { &m.seq },
                     |m: &mut Payload| { &mut m.seq },
@@ -1619,20 +1619,20 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x20\x01(\x08R\x06commit\"\x1f\n\x0bReadRequest\x12\x10\n\x03key\x18\x01\
     \x20\x01(\tR\x03key\"$\n\x0cReadResponse\x12\x14\n\x05value\x18\x01\x20\
     \x01(\x05R\x05value\"<\n\x08Instance\x12\x18\n\x07replica\x18\x01\x20\
-    \x01(\x05R\x07replica\x12\x16\n\x06number\x18\x02\x20\x01(\x05R\x06numbe\
-    r\"\xaf\x01\n\x07Payload\x12.\n\x07command\x18\x01\x20\x01(\x0b2\x14.epa\
-    xos.WriteRequestR\x07command\x12\x10\n\x03seq\x18\x02\x20\x01(\x05R\x03s\
-    eq\x124\n\x0cdependencies\x18\x03\x20\x03(\x0b2\x10.epaxos.InstanceR\x0c\
-    dependencies\x12,\n\x08instance\x18\x04\x20\x01(\x0b2\x10.epaxos.Instanc\
-    eR\x08instance\"o\n\x0fAcceptOKPayload\x12.\n\x07command\x18\x01\x20\x01\
-    (\x0b2\x14.epaxos.WriteRequestR\x07command\x12,\n\x08instance\x18\x04\
-    \x20\x01(\x0b2\x10.epaxos.InstanceR\x08instance2\x97\x01\n\x08Internal\
-    \x12-\n\tPreAccept\x12\x0f.epaxos.Payload\x1a\x0f.epaxos.Payload\x122\n\
-    \x06Accept\x12\x0f.epaxos.Payload\x1a\x17.epaxos.AcceptOKPayload\x12(\n\
-    \x06Commit\x12\x0f.epaxos.Payload\x1a\r.epaxos.Empty2s\n\x08External\x12\
-    4\n\x05Write\x12\x14.epaxos.WriteRequest\x1a\x15.epaxos.WriteResponse\
-    \x121\n\x04Read\x12\x13.epaxos.ReadRequest\x1a\x14.epaxos.ReadResponseb\
-    \x06proto3\
+    \x01(\rR\x07replica\x12\x16\n\x06number\x18\x02\x20\x01(\rR\x06number\"\
+    \xaf\x01\n\x07Payload\x12.\n\x07command\x18\x01\x20\x01(\x0b2\x14.epaxos\
+    .WriteRequestR\x07command\x12\x10\n\x03seq\x18\x02\x20\x01(\rR\x03seq\
+    \x124\n\x0cdependencies\x18\x03\x20\x03(\x0b2\x10.epaxos.InstanceR\x0cde\
+    pendencies\x12,\n\x08instance\x18\x04\x20\x01(\x0b2\x10.epaxos.InstanceR\
+    \x08instance\"o\n\x0fAcceptOKPayload\x12.\n\x07command\x18\x01\x20\x01(\
+    \x0b2\x14.epaxos.WriteRequestR\x07command\x12,\n\x08instance\x18\x04\x20\
+    \x01(\x0b2\x10.epaxos.InstanceR\x08instance2\x97\x01\n\x08Internal\x12-\
+    \n\tPreAccept\x12\x0f.epaxos.Payload\x1a\x0f.epaxos.Payload\x122\n\x06Ac\
+    cept\x12\x0f.epaxos.Payload\x1a\x17.epaxos.AcceptOKPayload\x12(\n\x06Com\
+    mit\x12\x0f.epaxos.Payload\x1a\r.epaxos.Empty2s\n\x08External\x124\n\x05\
+    Write\x12\x14.epaxos.WriteRequest\x1a\x15.epaxos.WriteResponse\x121\n\
+    \x04Read\x12\x13.epaxos.ReadRequest\x1a\x14.epaxos.ReadResponseb\x06prot\
+    o3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
