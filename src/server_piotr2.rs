@@ -1,12 +1,12 @@
 use std::cmp;
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 struct ReplicaId(usize);
 
 #[derive(Clone)]
 struct WriteRequest {
     key: String,
-    value: i32
+    value: i32,
 }
 
 #[derive(Clone)]
@@ -32,16 +32,25 @@ struct InstanceRef {
 
 #[derive(Clone)]
 struct Payload {
-    command: WriteRequest, // TODO maybe flatten into key/value
+    command: WriteRequest,
+    // TODO maybe flatten into key/value
     seq: usize,
     dependencies: Vec<InstanceRef>,
-    instance: InstanceRef
+    instance: InstanceRef,
 }
 
+struct PreAccept(Payload);
+
+struct Accept(Payload);
+
+struct Commit(Payload);
+
+struct PreAcceptOK(Payload);
+
 #[derive(Clone)]
-struct AcceptOKPayload {
+struct AcceptOK {
     command: WriteRequest,
-    instance: InstanceRef
+    instance: InstanceRef,
 }
 
 enum CommandState {
@@ -62,19 +71,18 @@ type Commands = Vec<Vec<Instance>>;
 
 struct Replica {
     id: ReplicaId,
-    commands: Commands
+    commands: Commands,
 }
 
 enum Path {
-    Slow(Payload),
-    Fast(Payload)
+    Slow(Accept),
+    Fast(WriteResponse, Commit),
 }
 
 const QUORUM: usize = 3;
 const REPLICAS_NUM: usize = 5;
 
 impl Replica {
-
     fn new(id: ReplicaId) -> Replica {
         let mut commands = Vec::new();
         for i in 0..REPLICAS_NUM {
@@ -83,15 +91,15 @@ impl Replica {
         Replica { id, commands }
     }
 
-    fn pre_accept_(&self, p: Payload) -> Payload {
+    fn pre_accept_(&self, p: PreAccept) -> PreAcceptOK {
         unimplemented!()
     }
 
-    fn accept_(&self, p: Payload) -> AcceptOKPayload {
+    fn accept_(&self, p: Accept) -> AcceptOK {
         unimplemented!()
     }
 
-    fn commit_(&self, p: Payload) -> () {
+    fn commit_(&self, p: Commit) -> () {
         unimplemented!()
     }
 
@@ -99,7 +107,7 @@ impl Replica {
 //        unimplemented!()
 //    }
 
-    fn establish_ordering_constraints1(&mut self, write_req: WriteRequest) -> Payload {
+    fn establish_ordering_constraints1(&mut self, write_req: WriteRequest) -> PreAccept {
         let dependencies = self.find_interference(&write_req.key);
         let seq = self.find_next_seq(&dependencies);
         let instance_number = self.commands[self.id.0].len();
@@ -111,40 +119,38 @@ impl Replica {
             state: CommandState::PreAccepted,
         });
 
-        Payload {
+        PreAccept(Payload {
             command: write_req,
             seq,
             dependencies,
             instance: InstanceRef {
                 replica: self.id.clone(),
-                slot: instance_number
-            }
-        }
-    }
-
-    fn commit_helper(&mut self, p: Payload) -> Payload {
-        unimplemented!()
-    }
-
-    fn paxos_accept(&mut self, p: Payload) -> Payload {
-        unimplemented!()
+                slot: instance_number,
+            },
+        })
     }
 
     // assume that, unlike in the paper, the `dependencies` field of a PreAcceptOkayResponse
     // contains the difference, not the union, of instance references
-    fn establish_ordering_constraints2(&mut self, pre_accept_request: Payload, pre_accept_ok_responses: [Payload; QUORUM - 1]) -> Path {
-        if pre_accept_ok_responses.iter().all(|response| response.seq == pre_accept_request.seq && response.dependencies.is_empty()) {
-            Path::Fast(self.commit_helper(pre_accept_request))
+    fn establish_ordering_constraints2(&mut self, mut pre_accept_request: PreAccept, mut pre_accept_ok_responses: [PreAcceptOK; QUORUM - 1]) -> Path {
+        if pre_accept_ok_responses.iter().all(|response| response.0.seq == pre_accept_request.0.seq && response.0.dependencies.is_empty()) {
+            self.commands[self.id.0][pre_accept_request.0.instance.slot].state = CommandState::Committed;
+            Path::Fast(WriteResponse { committed: true }, Commit(pre_accept_request.0))
         } else {
-            let mut p = pre_accept_request;
-            p.seq = pre_accept_ok_responses.iter().map(|r| r.seq).max().unwrap_or(p.seq);
-            for response in pre_accept_ok_responses.iter() {
-                // TODO use a mutable iterator here and append
-//                p.dependencies.append(response.dependencies);
-                unimplemented!()
+            let max_seq = pre_accept_ok_responses.iter().map(|r| r.0.seq).max().unwrap_or(0);
+            pre_accept_request.0.seq = std::cmp::max(max_seq, pre_accept_request.0.seq);
+            for response in &mut pre_accept_ok_responses {
+                pre_accept_request.0.dependencies.append(&mut response.0.dependencies);
             }
-            Path::Slow(self.paxos_accept(p))
+            // Paxos-Accept 1
+            self.commands[self.id.0][pre_accept_request.0.instance.slot].state = CommandState::Accepted;
+            Path::Slow(Accept(pre_accept_request.0))
         }
+    }
+
+    fn paxos_accept(&mut self, accept_req: Accept) -> (WriteResponse, Commit) {
+        self.commands[self.id.0][accept_req.0.instance.slot].state = CommandState::Committed;
+        (WriteResponse { committed: true }, Commit(accept_req.0))
     }
 
     fn write_(&self, p: WriteRequest) -> WriteResponse {
