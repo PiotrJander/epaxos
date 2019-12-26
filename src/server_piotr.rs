@@ -109,73 +109,7 @@ impl Epaxos {
         };
     }
 
-    fn pre_accept_(&self, p: Payload) -> Payload {
-        unimplemented!()
-    }
 
-    fn accept_(&self, p: Payload) -> AcceptOKPayload {
-        unimplemented!()
-    }
-
-    fn commit_(&self, p: Payload) -> () {
-        unimplemented!()
-    }
-
-    fn fast_quorum(&self) -> Vec<ReplicaId> {
-        unimplemented!()
-    }
-
-    fn establish_ordering_constraints1(&self, key: String, value: i32) {
-        let mut commands = self.commands.lock().unwrap();
-        let dependencies = find_interference(&commands, &key);
-        let seq = find_next_seq(&commands, &dependencies);
-        let instance_number = commands[self.id.0].len();
-        commands[self.id.0].push(Instance {
-            key,
-            value,
-            seq,
-            dependencies,
-            state: PreAccepted,
-        });
-        // TODO maybe duplicate gRPC data structures in rust and split into many files
-//        let pre_accept_payload = Payload {}
-        unimplemented!()
-    }
-
-    fn write_(&self, p: WriteRequest) -> WriteResponse {
-        self.establish_ordering_constraints1(p.key, p.value);
-
-        // TODO send internal messages and continue
-
-        unimplemented!()
-    }
-
-    fn read_(&self, p: ReadRequest) -> ReadResponse {
-        unimplemented!()
-    }
-}
-
-// FIXME we only record write commands - is this okay?
-// FIXME is this correct?
-fn find_interference(commands: &Commands, key: &String) -> Vec<InstanceRef> {
-    let mut acc = Vec::new();
-    for (q, row) in commands.iter().enumerate() {
-        for (j, instance) in row.iter().enumerate() {
-            if instance.key == *key {
-                acc.push(InstanceRef { replica: ReplicaId(q), slot: j })
-            }
-        }
-    }
-    acc
-}
-
-fn find_next_seq(commands: &Commands, deps: &Vec<InstanceRef>) -> usize {
-    let mut acc = 0;
-    for dep in deps {
-        let instance = &commands[dep.replica.0][dep.slot];
-        acc = cmp::max(acc, instance.seq)
-    }
-    acc + 1
 }
 
 fn start_server(service: ServerServiceDefinition, port: u16) -> () {
