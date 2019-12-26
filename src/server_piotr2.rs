@@ -1,4 +1,5 @@
 use std::cmp;
+use std::ops::Index;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 struct ReplicaId(usize);
@@ -24,7 +25,7 @@ struct ReadResponse {
     value: i32
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct InstanceRef {
     replica: ReplicaId,
     slot: usize,
@@ -78,23 +79,20 @@ impl Commands {
         };
         Commands(commands)
     }
+}
 
-    // FIXME how to have a version which is not mutable?
-    fn at(&mut self, ref_: &InstanceRef) -> &mut Instance {
+impl std::ops::Index<InstanceRef> for Commands {
+    type Output = Instance;
+
+    fn index(&self, ref_: InstanceRef) -> &Self::Output {
+        &self.0[ref_.replica.0][ref_.slot]
+    }
+}
+
+impl std::ops::IndexMut<InstanceRef> for Commands {
+
+    fn index_mut(&mut self, ref_: InstanceRef) -> &mut Self::Output {
         &mut self.0[ref_.replica.0][ref_.slot]
-    }
-
-    fn new_instance_number(&self, id: ReplicaId) -> usize {
-        self.0[id.0].len()
-    }
-
-    fn add_instance(&mut self, id: ReplicaId, instance: Instance) -> () {
-        self.0[id.0].push(instance)
-    }
-
-    // FIXME workaround for a missing iterator
-    fn vector(&self) -> &Vec<Vec<Instance>> {
-        &self.0
     }
 }
 
@@ -146,8 +144,8 @@ impl Replica {
 
         let dependencies = self.find_interference(&write_req.key);
         let seq = self.find_next_seq(&dependencies);
-        let instance_number = self.commands.new_instance_number(self.id);
-        self.commands.add_instance(self.id, Instance {
+        let instance_number = self.commands.0[self.id.0].len();
+        self.commands.0[self.id.0].push(Instance {
             key: write_req.key.clone(),
             value: write_req.value,
             seq,
@@ -177,7 +175,7 @@ impl Replica {
             response.0.seq == pre_accept_request.0.seq && response.0.dependencies.is_empty()
         });
         if fast_path {
-            self.commands.at(&pre_accept_request.0.instance).state = CommandState::Committed;
+            self.commands[pre_accept_request.0.instance].state = CommandState::Committed;
             Path::Fast(WriteResponse { committed: true }, Commit(pre_accept_request.0))
         } else {
             let max_seq = pre_accept_ok_responses.iter().map(|r| r.0.seq).max().unwrap_or(0);
@@ -186,13 +184,13 @@ impl Replica {
                 pre_accept_request.0.dependencies.append(&mut response.0.dependencies);
             }
             // Paxos-Accept 1
-            self.commands.at(&pre_accept_request.0.instance).state = CommandState::Accepted;
+            self.commands[pre_accept_request.0.instance].state = CommandState::Accepted;
             Path::Slow(Accept(pre_accept_request.0))
         }
     }
 
     fn paxos_accept(&mut self, accept_req: Accept) -> (WriteResponse, Commit) {
-        self.commands.at(&accept_req.0.instance).state = CommandState::Committed;
+        self.commands[accept_req.0.instance].state = CommandState::Committed;
         (WriteResponse { committed: true }, Commit(accept_req.0))
     }
 
@@ -208,7 +206,7 @@ impl Replica {
     // FIXME is this correct?
     fn find_interference(&self, key: &String) -> Vec<InstanceRef> {
         let mut acc = Vec::new();
-        for (q, row) in self.commands.vector().iter().enumerate() {
+        for (q, row) in self.commands.0.iter().enumerate() {
             for (j, instance) in row.iter().enumerate() {
                 if instance.key == *key {
                     acc.push(InstanceRef { replica: ReplicaId(q), slot: j })
@@ -222,7 +220,7 @@ impl Replica {
     fn find_next_seq(&mut self, deps: &Vec<InstanceRef>) -> usize {
         let mut acc = 0;
         for dep in deps {
-            let instance = self.commands.at(dep);
+            let instance = &self.commands[*dep];
             acc = cmp::max(acc, instance.seq)
         }
         acc + 1
