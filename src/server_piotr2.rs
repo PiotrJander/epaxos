@@ -65,6 +65,11 @@ struct Replica {
     commands: Commands
 }
 
+enum Path {
+    Slow(Payload),
+    Fast(Payload)
+}
+
 const QUORUM: usize = 3;
 const REPLICAS_NUM: usize = 5;
 
@@ -117,14 +122,28 @@ impl Replica {
         }
     }
 
+    fn commit_helper(&mut self, p: Payload) -> Payload {
+        unimplemented!()
+    }
+
+    fn paxos_accept(&mut self, p: Payload) -> Payload {
+        unimplemented!()
+    }
+
     // assume that, unlike in the paper, the `dependencies` field of a PreAcceptOkayResponse
     // contains the difference, not the union, of instance references
-    fn establish_ordering_constraints2(&self, pre_accept_request: Payload, pre_accept_ok_responses: [Payload; QUORUM - 1]) {
-//        let mut dependencies1 = pre_accept_request.dependencies.clone();
+    fn establish_ordering_constraints2(&mut self, pre_accept_request: Payload, pre_accept_ok_responses: [Payload; QUORUM - 1]) -> Path {
         if pre_accept_ok_responses.iter().all(|response| response.seq == pre_accept_request.seq && response.dependencies.is_empty()) {
-            unimplemented!()
+            Path::Fast(self.commit_helper(pre_accept_request))
         } else {
-            unimplemented!()
+            let mut p = pre_accept_request;
+            p.seq = pre_accept_ok_responses.iter().map(|r| r.seq).max().unwrap_or(p.seq);
+            for response in pre_accept_ok_responses.iter() {
+                // TODO use a mutable iterator here and append
+//                p.dependencies.append(response.dependencies);
+                unimplemented!()
+            }
+            Path::Slow(self.paxos_accept(p))
         }
     }
 
