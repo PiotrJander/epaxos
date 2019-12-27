@@ -3,65 +3,64 @@ use std::collections::HashMap;
 
 // FIXME maybe delete
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
-struct ReplicaId(usize);
+pub struct ReplicaId(usize);
 
 #[derive(Clone)]
-struct WriteRequest {
-    key: String,
-    value: i32,
+pub struct WriteRequest {
+    pub key: String,
+    pub value: i32,
 }
 
 #[derive(Clone)]
-struct WriteResponse {
-    committed: bool
+pub struct WriteResponse {
+    pub committed: bool
 }
 
 #[derive(Clone)]
-struct ReadRequest {
-    key: String
+pub struct ReadRequest {
+    pub key: String
 }
 
 #[derive(Clone)]
-struct ReadResponse {
-    value: i32
+pub struct ReadResponse {
+    pub value: i32
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct InstanceRef {
+pub struct InstanceRef {
     replica: ReplicaId,
     slot: usize,
 }
 
 #[derive(Clone)]
-struct Payload {
-    command: WriteRequest,
-    // TODO maybe flatten into key/value
-    seq: usize,
-    dependencies: Vec<InstanceRef>,
-    instance: InstanceRef,
+pub struct Payload {
+    pub command: WriteRequest,
+    pub seq: usize,
+    pub dependencies: Vec<InstanceRef>,
+    pub instance: InstanceRef,
 }
 
-struct PreAccept(Payload);
+pub struct PreAccept(pub Payload);
 
-struct Accept(Payload);
+pub struct Accept(pub Payload);
 
-struct Commit(Payload);
+pub struct Commit(pub Payload);
 
-struct PreAcceptOK(Payload);
+pub struct PreAcceptOK(pub Payload);
 
 #[derive(Clone)]
-struct AcceptOK {
-    command: WriteRequest,
-    instance: InstanceRef,
+pub struct AcceptOK {
+    pub command: WriteRequest,
+    pub instance: InstanceRef,
 }
 
-enum CommandState {
+pub enum CommandState {
     PreAccepted,
     Accepted,
     Committed,
 }
 
-struct Instance {
+pub struct Instance {
     command: WriteRequest,
     seq: usize,
     dependencies: Vec<InstanceRef>,
@@ -69,7 +68,7 @@ struct Instance {
 }
 
 // TODO use HashMap instead
-struct Commands(HashMap<InstanceRef, Instance>);
+pub struct Commands(pub HashMap<InstanceRef, Instance>);
 
 impl Commands {
     fn new() -> Self {
@@ -94,13 +93,13 @@ impl std::ops::IndexMut<InstanceRef> for Commands {
     }
 }
 
-struct Replica {
-    id: ReplicaId,
-    commands: Commands,
-    instance_number: usize,
+pub struct Replica {
+    pub id: ReplicaId,
+    pub commands: Commands,
+    pub instance_number: usize,
 }
 
-enum Path {
+pub enum Path {
     Slow(Accept),
     Fast(WriteResponse, Commit),
 }
@@ -113,7 +112,7 @@ impl Replica {
         Replica { id, commands: Commands::new(), instance_number: 0 }
     }
 
-    fn pre_accept_(&mut self, pre_accept_req: PreAccept) -> PreAcceptOK {
+    pub fn pre_accept_(&mut self, pre_accept_req: PreAccept) -> PreAcceptOK {
         let Payload { command, seq, mut dependencies, instance } =
             pre_accept_req.0;
         let dependencies1 = self.find_interference(&command.key);
@@ -149,7 +148,7 @@ impl Replica {
         })
     }
 
-    fn accept_(&mut self, accept_req: Accept) -> AcceptOK {
+    pub fn accept_(&mut self, accept_req: Accept) -> AcceptOK {
         let Payload { command, seq, mut dependencies, instance } = accept_req.0;
         self.commands[instance] = Instance {
             command: command.clone(),
@@ -163,7 +162,7 @@ impl Replica {
         }
     }
 
-    fn commit_(&mut self, commit_req: Commit) -> () {
+    pub fn commit_(&mut self, commit_req: Commit) -> () {
         let Payload { command, seq, mut dependencies, instance } = commit_req.0;
         self.commands[instance] = Instance {
             command: command.clone(),
@@ -184,7 +183,7 @@ impl Replica {
         }
     }
 
-    fn write1(&mut self, write_req: WriteRequest) -> PreAccept {
+    pub fn write1(&mut self, write_req: WriteRequest) -> PreAccept {
 
         let dependencies = self.find_interference(&write_req.key);
         let seq = self.find_next_seq(&dependencies);
@@ -209,7 +208,7 @@ impl Replica {
 
     // assume that, unlike in the paper, the `dependencies` field of a PreAcceptOkayResponse
     // contains the difference, not the union, of instance references
-    fn write2(
+    pub fn write2(
         &mut self,
         mut pre_accept_req: PreAccept,
         mut pre_accept_resps: [PreAcceptOK; QUORUM - 1],
@@ -234,7 +233,7 @@ impl Replica {
         }
     }
 
-    fn leader_commit(&mut self, payload: Payload) -> (WriteResponse, Commit) {
+    pub fn leader_commit(&mut self, payload: Payload) -> (WriteResponse, Commit) {
         let Payload { command, seq, mut dependencies, instance } = payload;
         self.commands[payload.instance] = Instance {
             command: command.clone(),
@@ -245,7 +244,7 @@ impl Replica {
         (WriteResponse { committed: true }, Commit(Payload { command, seq, dependencies, instance } ))
     }
 
-    fn read_(&self, p: ReadRequest) -> ReadResponse {
+    pub fn read_(&self, p: ReadRequest) -> ReadResponse {
         unimplemented!()
     }
 
