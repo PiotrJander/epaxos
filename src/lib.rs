@@ -6,4 +6,4 @@ extern crate protobuf;
 pub mod epaxos;
 pub mod epaxos_grpc;
 pub mod logic;
-pub mod server;
+pub mod conversions;
