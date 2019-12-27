@@ -1,444 +1,282 @@
-extern crate epaxos_rs;
-extern crate futures;
-extern crate futures_cpupool;
-extern crate grpc;
-extern crate protobuf;
+use std::cmp;
+use std::collections::HashMap;
 
-use epaxos_rs::epaxos::*;
-use epaxos_rs::epaxos_grpc::*;
-use grpc::ClientStub;
-use std::{
-    cmp,
-    collections::{HashMap, HashSet},
-    env,
-    sync::{Arc, Mutex},
-    thread,
-};
-
-const SLOW_QUORUM: usize = 3; // floor(N/2)
-const FAST_QUORUM: usize = 3; // 1 + floor(F+1/2)
-const REPLICAS_NUM: usize = 5;
-const LOCALHOST: &str = "127.0.0.1";
-static REPLICA_INTERNAL_PORTS: &'static [u16] = &[10000, 10001, 10002, 10003, 10004, 10005];
-static REPLICA_EXTERNAL_PORTS: &'static [u16] = &[10000, 10001, 10002, 10003, 10004, 10005];
-
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+// FIXME maybe delete
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 struct ReplicaId(usize);
 
-#[derive(Debug, Clone)]
-enum State {
+#[derive(Clone)]
+struct WriteRequest {
+    key: String,
+    value: i32,
+}
+
+#[derive(Clone)]
+struct WriteResponse {
+    committed: bool
+}
+
+#[derive(Clone)]
+struct ReadRequest {
+    key: String
+}
+
+#[derive(Clone)]
+struct ReadResponse {
+    value: i32
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct InstanceRef {
+    replica: ReplicaId,
+    slot: usize,
+}
+
+#[derive(Clone)]
+struct Payload {
+    command: WriteRequest,
+    // TODO maybe flatten into key/value
+    seq: usize,
+    dependencies: Vec<InstanceRef>,
+    instance: InstanceRef,
+}
+
+struct PreAccept(Payload);
+
+struct Accept(Payload);
+
+struct Commit(Payload);
+
+struct PreAcceptOK(Payload);
+
+#[derive(Clone)]
+struct AcceptOK {
+    command: WriteRequest,
+    instance: InstanceRef,
+}
+
+enum CommandState {
     PreAccepted,
     Accepted,
     Committed,
 }
 
-#[derive(Clone)]
-struct Epaxos {
-    // In grpc, parameters in service are immutable.
-    // See https://github.com/stepancheg/grpc-rust/blob/master/docs/FAQ.md
+struct Instance {
+    command: WriteRequest,
+    seq: usize,
+    dependencies: Vec<InstanceRef>,
+    state: CommandState,
+}
+
+// TODO use HashMap instead
+struct Commands(HashMap<InstanceRef, Instance>);
+
+impl Commands {
+    fn new() -> Self {
+        Commands(HashMap::new())
+    }
+}
+
+impl std::ops::Index<InstanceRef> for Commands {
+
+    type Output = Instance;
+
+    fn index(&self, index: InstanceRef) -> &Self::Output {
+        &self.0[&index]
+    }
+}
+
+impl std::ops::IndexMut<InstanceRef> for Commands {
+
+    // unsafe: requires that the key is present
+    fn index_mut(&mut self, index: InstanceRef) -> &mut Self::Output {
+        self.0.get_mut(&index).unwrap()
+    }
+}
+
+struct Replica {
     id: ReplicaId,
-    store: Arc<Mutex<HashMap<String, i32>>>,
-    cmds: Arc<Mutex<Vec<HashMap<usize, LogEntry>>>>, // vectors are growable arrays
-    instance_number: Arc<Mutex<u32>>,
-    replicas: Arc<Mutex<HashMap<ReplicaId, EpaxosExternalClient>>>,
+    commands: Commands,
+    instance_number: usize,
 }
 
-#[derive(Debug, Clone)]
-struct LogEntry {
-    key: String,
-    value: i32,
-    seq: u32,
-    deps: Vec<Instance>,
-    state: State,
+enum Path {
+    Slow(Accept),
+    Fast(WriteResponse, Commit),
 }
 
-// TODO be careful of deadlocks, acquire in order pls
-// avoid recursive locking (locking twice in same thread)
+const QUORUM: usize = 3;
+const REPLICAS_NUM: usize = 5;
 
-#[derive(Debug)]
-struct CommandInstance {
-    replica: usize,
-    slot: usize,
-}
+impl Replica {
+    fn new(id: ReplicaId) -> Replica {
+        Replica { id, commands: Commands::new(), instance_number: 0 }
+    }
 
-impl Epaxos {
-    fn init(id: ReplicaId) -> Epaxos {
-        let mut commands = Vec::new();
-        let mut replicas = HashMap::new();
-
-        for i in 0..REPLICAS_NUM {
-            commands.insert(i, HashMap::new());
-            if i == id.0 {
-                continue;
+    fn pre_accept_(&mut self, pre_accept_req: PreAccept) -> PreAcceptOK {
+        let Payload { command, seq, mut dependencies, instance } =
+            pre_accept_req.0;
+        let dependencies1 = self.find_interference(&command.key);
+        let seq_candidate = self.find_next_seq(&dependencies1);
+        let seq1 = cmp::max(seq, seq_candidate);
+        let mut dep_diff = Vec::new();
+        for dep in dependencies1 {
+            // FIXME contains inefficient for a vector, but it doesn't matter
+            if !dependencies.contains(&dep) {
+                dep_diff.push(dep);
             }
-            let internal_client = grpc::Client::new_plain(
-                LOCALHOST,
-                REPLICA_INTERNAL_PORTS[i as usize],
-                Default::default(),
-            )
-                .unwrap();
-            println!(
-                "Replica {} created : {:?}",
-                i, REPLICA_INTERNAL_PORTS[i as usize]
-            );
-            let replica = EpaxosExternalClient::with_client(Arc::new(internal_client));
-            replicas.insert(ReplicaId(i), replica);
         }
 
-        return Epaxos {
-            id: id.clone(),
-            store: Arc::new(Mutex::new(HashMap::new())),
-            cmds: Arc::new(Mutex::new(commands)),
-            instance_number: Arc::new(Mutex::new(0)),
-            replicas: Arc::new(Mutex::new(replicas)),
+        // FIXME use some kind of idiom here
+        // find the union
+        for dep in &dep_diff {
+            dependencies.push(*dep)
+        }
+
+        // unlike in the paper, PreAcceptOK contains the difference, not the union
+        self.commands.0.insert(instance, Instance {
+            command: command.clone(),
+            seq: seq1,
+            dependencies,
+            state: CommandState::PreAccepted
+        });
+
+        PreAcceptOK(Payload {
+            command,
+            seq: seq1,
+            dependencies: dep_diff,
+            instance
+        })
+    }
+
+    fn accept_(&mut self, accept_req: Accept) -> AcceptOK {
+        let Payload { command, seq, mut dependencies, instance } = accept_req.0;
+        self.commands[instance] = Instance {
+            command: command.clone(),
+            seq,
+            dependencies,
+            state: CommandState::Accepted
+        };
+        AcceptOK {
+            command: command.clone(),
+            instance
+        }
+    }
+
+    fn commit_(&mut self, commit_req: Commit) -> () {
+        let Payload { command, seq, mut dependencies, instance } = commit_req.0;
+        self.commands[instance] = Instance {
+            command: command.clone(),
+            seq,
+            dependencies,
+            state: CommandState::Accepted
         };
     }
 
-    // we only need to do consensus for write req
-    fn consensus(&self, write_req: &WriteRequest) -> bool {
-        println!("===============");
-        println!("Starting consensus");
-        let slot = *self.instance_number.lock().unwrap();
-        let mut payload = Payload::new();
-        let mut instance = Instance::new();
-        instance.set_replica(self.id.0 as u32);
-        instance.set_slot(slot);
-        payload.set_instance(instance);
-        payload.set_write_req(write_req.clone());
-        let mut interf = self.find_interference(write_req.get_key().to_owned());
-        payload.set_deps(protobuf::RepeatedField::from_vec(interf.clone()));
-        let mut seq = 1 + self.find_max_seq(&interf);
-        payload.set_seq(seq);
-        let mut log_entry = LogEntry {
-            key: write_req.get_key().to_owned(),
-            value: write_req.get_value(),
-            seq: seq,
-            deps: interf.clone(),
-            state: State::PreAccepted,
-        };
-        (*self.cmds.lock().unwrap())[self.id.0].insert(slot as usize, log_entry.clone());
-        let mut fast_quorum = 1; // Leader votes for itself
-        let mut slow_path = false;
-        let mut fast_path = false;
-        // Send PreAccept message to replicas in Fast Quorum
-        for i in 1..FAST_QUORUM {
-            // if i == self.id.0 {
-            //     continue;
-            // }
-            let mut quorum_member = (self.id.0 as i32 - i as i32).abs();
-            if quorum_member == self.id.0 as i32 {
-                println!("!!");
-                quorum_member = (self.id.0 as i32 - i as i32 - 1).abs();
-            }
-            println!(
-                "Replica {} Sending pre_accept to replica {}",
-                self.id.0, quorum_member
-            );
-            let pre_accept_ok = (*self.replicas.lock().unwrap())
-                .get(&ReplicaId(quorum_member as usize))
-                .unwrap()
-                .pre_accept(grpc::RequestOptions::new(), payload.clone());
-            //TODO: thread::spawn(move || {
+    //    fn fast_quorum(&self) -> Vec<ReplicaId> {
+    //        unimplemented!()
+    //    }
 
-            // });
-            match pre_accept_ok.wait() {
-                Err(e) => panic!("[PreAccept Stage] Replica panic {:?}", e),
-                Ok((_, value, _))
-                if value.get_seq() == payload.get_seq()
-                    && value.get_deps() == payload.get_deps() =>
-                    {
-                        println!("Got an agreeing PreAcceptOK: {:?}", value);
-                        fast_quorum += 1;
-                    }
-                // TODO: slow path here
-                Ok((_, value, _)) => {
-                    slow_path = true;
-                    println!("Some dissenting voice here! {:?}", value);
-                    // Union deps from all replies
-                    let new_deps = protobuf::RepeatedField::from_vec(value.get_deps().to_vec());
-                    for new_dep in new_deps.iter() {
-                        if !interf.contains(new_dep) {
-                            interf.push(new_dep.clone());
-                        }
-                    }
-                    // Set seq to max of seq from all replies
-                    if value.get_seq() > seq {
-                        seq = value.get_seq();
-                    }
-                    log_entry.deps = interf.clone();
-                    (*self.cmds.lock().unwrap())[self.id.0]
-                        .insert(slot as usize, log_entry.clone());
-                    payload.set_deps(protobuf::RepeatedField::from_vec(interf.clone()));
-                    payload.set_seq(seq);
-                }
-            }
+    fn current_instance_ref(&self) -> InstanceRef {
+        InstanceRef {
+            replica: self.id,
+            slot: self.instance_number,
         }
+    }
 
-        if fast_quorum >= FAST_QUORUM {
-            fast_path = true;
-        }
+    fn write1(&mut self, write_req: WriteRequest) -> PreAccept {
 
-        if slow_path {
-            log_entry.state = State::Accepted;
-            // Update the state of the command in the slot to Accepted
-            (*self.cmds.lock().unwrap())[self.id.0].insert(slot as usize, log_entry.clone());
-            // Run Paxos-Accept phase for new deps and new seq
-            // Send Accept message to at least floor(N/2) other replicas
-            let mut accept_ok_count = 1;
-            //for i in 0..REPLICAS_NUM {
-            for i in 1..FAST_QUORUM {
-                // if i == self.id.0 {
-                //     continue;
-                // }
-                let mut quorum_member = (self.id.0 as i32 - i as i32).abs();
-                if quorum_member == self.id.0 as i32 {
-                    println!("!!");
-                    quorum_member = (self.id.0 as i32 - i as i32 - 1).abs();
-                }
-                println!(
-                    "Replica {} sending ACCEPT to replica {}",
-                    self.id.0, quorum_member
-                );
-                let accept_ok = (*self.replicas.lock().unwrap())
-                    .get(&ReplicaId(quorum_member as usize))
-                    .unwrap()
-                    .accept(grpc::RequestOptions::new(), payload.clone());
-                match accept_ok.wait() {
-                    Err(e) => panic!("[Paxos-Accept Stage] Replica panic {:?}", e),
-                    Ok((_, value, _)) => {
-                        println!("[Paxos-Accept Stage] got {:?}", value);
-                        accept_ok_count += 1;
-                    }
-                }
-            }
-            if accept_ok_count >= SLOW_QUORUM {
-                fast_path = true;
-            }
-        }
+        let dependencies = self.find_interference(&write_req.key);
+        let seq = self.find_next_seq(&dependencies);
+        self.instance_number += 1;
+        self.commands.0.insert(self.current_instance_ref(), Instance {
+            command: write_req.clone(),
+            seq,
+            dependencies: dependencies.clone(),
+            state: CommandState::PreAccepted
+        });
 
-        // Commit stage if has quorum
+        PreAccept(Payload {
+            command: write_req,
+            seq,
+            dependencies,
+            instance: InstanceRef {
+                replica: self.id,
+                slot: self.instance_number,
+            },
+        })
+    }
+
+    // assume that, unlike in the paper, the `dependencies` field of a PreAcceptOkayResponse
+    // contains the difference, not the union, of instance references
+    fn write2(
+        &mut self,
+        mut pre_accept_req: PreAccept,
+        mut pre_accept_resps: [PreAcceptOK; QUORUM - 1],
+    ) -> Path {
+        let fast_path = pre_accept_resps.iter().all(|response| {
+            response.0.seq == pre_accept_req.0.seq && response.0.dependencies.is_empty()
+        });
         if fast_path {
-            // Update the state in the log to commit
-            log_entry.state = State::Committed;
-            (*self.cmds.lock().unwrap())[self.id.0].insert(slot as usize, log_entry);
-
-            // Send Commit message to all replicas
-            for i in 1..FAST_QUORUM {
-                // if i == self.id.0 {
-                //     continue;
-                // }
-                let mut quorum_member = (self.id.0 as i32 - i as i32).abs();
-                if quorum_member == self.id.0 as i32 {
-                    println!("!!");
-                    quorum_member = (self.id.0 as i32 - i as i32 - 1).abs();
-                }
-                (*self.replicas.lock().unwrap())
-                    .get(&ReplicaId(quorum_member as usize))
-                    .unwrap()
-                    .commit(grpc::RequestOptions::new(), payload.clone());
-                println!("Sending Commit to replica {}", i);
-            }
-            *self.instance_number.lock().unwrap() += 1;
-            println!("My log is {:?}", *self.cmds.lock().unwrap());
-            return true;
-        }
-        println!("Consensus failed.");
-        return false;
-        // TODO: how to wait for replies w/o blocking
-    }
-
-    fn find_max_seq(&self, interf: &Vec<Instance>) -> u32 {
-        let mut seq = 0;
-        for instance in interf {
-            let interf_seq = (*self.cmds.lock().unwrap())[instance.get_replica() as usize]
-                .get(&(instance.get_slot() as usize))
-                .unwrap()
-                .seq;
-            if interf_seq > seq {
-                seq = interf_seq;
-            }
-        }
-        return seq;
-    }
-
-    fn find_interference(&self, key: String) -> Vec<Instance> {
-        println!("Finding interf");
-        let mut interf = Vec::new();
-        for replica in 0..REPLICAS_NUM {
-            for (slot, log_entry) in (*self.cmds.lock().unwrap())[replica].iter() {
-                if log_entry.key == key {
-                    let mut instance = Instance::new();
-                    instance.set_replica(replica as u32);
-                    instance.set_slot(*slot as u32);
-                    interf.push(instance);
-                }
-            }
-        }
-        println!("Found interf : {:?}", interf);
-        interf
-    }
-
-    fn execute(&self) {
-        println!("Executing");
-    }
-}
-
-impl EpaxosExternal for Epaxos {
-    fn write(
-        &self,
-        _m: grpc::RequestOptions,
-        req: WriteRequest,
-    ) -> grpc::SingleResponse<WriteResponse> {
-        println!(
-            "Received a write request with key = {} and value = {}",
-            req.get_key(),
-            req.get_value()
-        );
-        let mut r = WriteResponse::new();
-        if self.consensus(&req) {
-            // TODO when do I actually execute?
-            (*self.store.lock().unwrap()).insert(req.get_key().to_owned(), req.get_value());
-            println!("Consensus successful. Sending a commit to client\n\n\n\n.");
-            r.set_commit(true);
+            // no need to update seq or dependencies
+            self.commands[pre_accept_req.0.instance].state = CommandState::Committed;
+            Path::Fast(WriteResponse { committed: true }, Commit(pre_accept_req.0))
         } else {
-            println!("Consensus failed. Notifying client.");
-            r.set_commit(false);
+            let max_seq =
+                pre_accept_resps.iter().map(|r| r.0.seq).max().unwrap_or(0);
+            pre_accept_req.0.seq = std::cmp::max(max_seq, pre_accept_req.0.seq);
+            for response in &mut pre_accept_resps {
+                pre_accept_req.0.dependencies.append(&mut response.0.dependencies);
+            }
+            // Paxos-Accept 1
+            self.commands[pre_accept_req.0.instance].state = CommandState::Accepted;
+            Path::Slow(Accept(pre_accept_req.0))
         }
-        grpc::SingleResponse::completed(r)
     }
-    fn read(
-        &self,
-        _m: grpc::RequestOptions,
-        req: ReadRequest,
-    ) -> grpc::SingleResponse<ReadResponse> {
-        println!("Received a read request with key = {}", req.get_key());
-        self.execute();
-        let mut r = ReadResponse::new();
-        r.set_value(*((*self.store.lock().unwrap()).get(req.get_key())).unwrap());
-        grpc::SingleResponse::completed(r)
-    }
-    // }
 
-    // impl EpaxosInternal for Epaxos {
-    fn pre_accept(
-        &self,
-        o: grpc::RequestOptions,
-        payload: Payload,
-    ) -> grpc::SingleResponse<Payload> {
-        println!("=====PRE==ACCEPT========");
-        println!(
-            "Replica {} received a PreAccept from {}\n
-            Write Key: {}, value: {}",
-            self.id.0,
-            payload.get_instance().get_replica(),
-            payload.get_write_req().get_key(),
-            payload.get_write_req().get_value()
-        );
-        let key = payload.get_write_req().get_key();
-        let sending_replica_id = payload.get_instance().get_replica();
-        let slot = payload.get_instance().get_slot();
-        let interf = self.find_interference(key.to_owned());
-        let seq = cmp::max(payload.get_seq(), 1 + self.find_max_seq(&interf));
-        // Union interf with deps
-        let mut deps = payload.get_deps().to_vec();
-        for interf_command in interf.iter() {
-            if !deps.contains(interf_command) {
-                deps.push(interf_command.clone());
+    fn leader_commit(&mut self, payload: Payload) -> (WriteResponse, Commit) {
+        let Payload { command, seq, mut dependencies, instance } = payload;
+        self.commands[payload.instance] = Instance {
+            command: command.clone(),
+            seq,
+            dependencies: dependencies.clone(),
+            state: CommandState::Committed
+        };
+        (WriteResponse { committed: true }, Commit(Payload { command, seq, dependencies, instance } ))
+    }
+
+    fn read_(&self, p: ReadRequest) -> ReadResponse {
+        unimplemented!()
+    }
+
+    // FIXME we only record write commands - is this okay?
+    // FIXME is this correct?
+    fn find_interference(&self, key: &String) -> Vec<InstanceRef> {
+        let mut acc: Vec<InstanceRef> = Vec::new();
+        for (ref_, instance) in &self.commands.0 {
+            if instance.command.key == *key {
+                acc.push(*ref_);
             }
         }
-        // Add to cmd log
-        let log_entry = LogEntry {
-            key: key.to_owned(),
-            value: payload.get_write_req().get_value(),
-            seq: seq,
-            deps: deps.clone(),
-            state: State::PreAccepted,
-        };
-        (*self.cmds.lock().unwrap())[sending_replica_id as usize].insert(slot as usize, log_entry);
-
-        let mut r = payload.clone();
-        r.set_seq(seq);
-        r.set_deps(protobuf::RepeatedField::from_vec(deps.clone()));
-        println!("===============");
-        return grpc::SingleResponse::completed(r);
+        acc
     }
 
-    fn accept(
-        &self,
-        o: grpc::RequestOptions,
-        payload: Payload,
-    ) -> grpc::SingleResponse<AcceptOKPayload> {
-        println!("=======ACCEPT========");
-        println!(
-            "Replica {} received an Accept from {}\n",
-            self.id.0,
-            payload.get_instance().get_replica()
-        );
-        let sending_replica_id = payload.get_instance().get_replica();
-        let slot = payload.get_instance().get_slot();
-        let log_entry = LogEntry {
-            key: payload.get_write_req().get_key().to_owned(),
-            value: payload.get_write_req().get_value(),
-            seq: payload.get_seq(),
-            deps: payload.get_deps().to_vec(),
-            state: State::Accepted,
-        };
-        (*self.cmds.lock().unwrap())[sending_replica_id as usize].insert(slot as usize, log_entry);
-        let mut r = AcceptOKPayload::new();
-        r.set_command(payload.get_write_req().clone());
-        r.set_instance(payload.get_instance().clone());
-        println!("===============");
-        return grpc::SingleResponse::completed(r);
-    }
-
-    fn commit(&self, o: grpc::RequestOptions, payload: Payload) -> grpc::SingleResponse<Empty> {
-        println!("======COMMIT=========");
-        println!(
-            "Replica {} received a Commit from {}\n
-            Write Key: {}, value: {}",
-            self.id.0,
-            payload.get_instance().get_replica(),
-            payload.get_write_req().get_key(),
-            payload.get_write_req().get_value()
-        );
-        let sending_replica_id = payload.get_instance().get_replica();
-        let slot = payload.get_instance().get_slot();
-        let log_entry = LogEntry {
-            key: payload.get_write_req().get_key().to_owned(),
-            value: payload.get_write_req().get_value(),
-            seq: payload.get_seq(),
-            deps: payload.get_deps().to_vec(),
-            state: State::Committed,
-        };
-        // Update the state in the log to commit
-
-        (*self.cmds.lock().unwrap())[sending_replica_id as usize].insert(slot as usize, log_entry);
-        println!("My log is {:?}", *self.cmds.lock().unwrap());
-        println!("===============");
-        let r = Empty::new();
-        return grpc::SingleResponse::completed(r);
+    fn find_next_seq(&self, deps: &Vec<InstanceRef>) -> usize {
+        let mut acc = 0;
+        for dep in deps {
+            let instance = &self.commands[*dep];
+            acc = cmp::max(acc, instance.seq)
+        }
+        acc + 1
     }
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+fn main() {}
 
-    let id: u32 = args[1].parse().unwrap();
-    let internal_port = REPLICA_INTERNAL_PORTS[id as usize];
-    let external_port = REPLICA_EXTERNAL_PORTS[id as usize];
-    let mut server_builder1 = grpc::ServerBuilder::new_plain();
-    server_builder1.add_service(EpaxosExternalServer::new_service_def(Epaxos::init(
-        ReplicaId(id as usize),
-    )));
-    // server_builder1.add_service(EpaxosInternalServer::new_service_def(Epaxos::init(
-    //     ReplicaId(id as usize),
-    // )));
-    server_builder1.http.set_port(internal_port);
-    let server1 = server_builder1.build().expect("build");
-    println!("server started on addr {}", server1.local_addr());
 
-    // Blocks the main thread forever
-    loop {
-        thread::park();
-    }
-}
+
+
+
+
+
+
