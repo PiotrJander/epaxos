@@ -7,3 +7,4 @@ pub mod epaxos;
 pub mod epaxos_grpc;
 pub mod logic;
 pub mod conversions;
+pub mod server;

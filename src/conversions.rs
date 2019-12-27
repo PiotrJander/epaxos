@@ -64,11 +64,11 @@ impl Payload {
 }
 
 impl AcceptOK {
-    pub fn from_grpc(resp: epaxos::AcceptOK) -> Self {
+    pub fn from_grpc(resp: epaxos::AcceptOKPayload) -> Self {
         unimplemented!()
     }
 
-    pub fn to_grpc(&self) -> epaxos::AcceptOK {
+    pub fn to_grpc(&self) -> epaxos::AcceptOKPayload {
         unimplemented!()
     }
 }

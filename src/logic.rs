@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 // FIXME maybe delete
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
-pub struct ReplicaId(usize);
+pub struct ReplicaId(pub usize);
 
 #[derive(Clone)]
 pub struct WriteRequest {
@@ -108,7 +108,7 @@ const QUORUM: usize = 3;
 const REPLICAS_NUM: usize = 5;
 
 impl Replica {
-    fn new(id: ReplicaId) -> Replica {
+    pub fn new(id: ReplicaId) -> Replica {
         Replica { id, commands: Commands::new(), instance_number: 0 }
     }
 
