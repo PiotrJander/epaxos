@@ -172,10 +172,6 @@ impl Replica {
         };
     }
 
-    //    fn fast_quorum(&self) -> Vec<ReplicaId> {
-    //        unimplemented!()
-    //    }
-
     fn current_instance_ref(&self) -> InstanceRef {
         InstanceRef {
             replica: self.id,
@@ -211,7 +207,7 @@ impl Replica {
     pub fn write2(
         &mut self,
         mut pre_accept_req: PreAccept,
-        mut pre_accept_resps: [PreAcceptOK; QUORUM - 1],
+        mut pre_accept_resps: Vec<PreAcceptOK>,
     ) -> Path {
         let fast_path = pre_accept_resps.iter().all(|response| {
             response.0.seq == pre_accept_req.0.seq && response.0.dependencies.is_empty()

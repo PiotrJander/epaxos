@@ -6,8 +6,7 @@ extern crate protobuf;
 use crate::epaxos_grpc::*;
 use grpc::{ClientStub, RequestOptions, SingleResponse};
 use std::{
-    cmp,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env,
     sync::{Arc, Mutex},
     thread,
@@ -16,6 +15,7 @@ use grpc::rt::ServerServiceDefinition;
 use crate::logic::*;
 use crate::conversions::*;
 use crate::epaxos;
+use std::sync::MutexGuard;
 
 const QUORUM: usize = 3;
 const REPLICAS_NUM: usize = 5;
@@ -46,6 +46,16 @@ impl Server {
             internal_clients: Arc::new(Mutex::new(internal_clients)),
         }
     }
+
+    // TODO how do we choose the quorum? can it always be the same? how do we deal with replica failures?
+    fn fast_quorum(&self) -> [ReplicaId; QUORUM - 1] {
+        unimplemented!()
+    }
+
+    fn slow_path(&self, mut replica: MutexGuard<Replica>, accept_req: Accept) -> (WriteResponse, Commit) {
+        // TODO send accept and obtain responses
+        replica.leader_commit(accept_req.0)
+    }
 }
 
 impl Internal for Server {
@@ -72,8 +82,27 @@ impl Internal for Server {
 }
 
 impl External for Server {
+
     fn write(&self, o: RequestOptions, p: epaxos::WriteRequest) -> SingleResponse<epaxos::WriteResponse> {
-        unimplemented!()
+        let mut replica = self.replica.lock().unwrap();
+        let mut internal_clients = self.internal_clients.lock().unwrap();
+        let request = WriteRequest::from_grpc(p);
+        let pre_accept_request = replica.write1(request);
+
+        // make pre_accept requests
+        let mut pre_accept_responses = Vec::new();
+        for (i, id) in self.fast_quorum().iter().enumerate() {
+            let single_response = internal_clients[id].pre_accept(RequestOptions::new(), pre_accept_request.0.to_grpc());
+            let response = unimplemented!();  // TODO how to deal with futures in rust
+            pre_accept_responses.push(response)
+        }
+
+        let (write_resp, commit_req) = match replica.write2(pre_accept_request, pre_accept_responses) {
+            Path::Fast(write_resp, commit_req) => (write_resp, commit_req),
+            Path::Slow(accept_req) => self.slow_path(replica, accept_req)
+        };
+        // TODO spawn async threads with commit
+        grpc::SingleResponse::completed(write_resp.to_grpc())
     }
 
     fn read(&self, o: RequestOptions, p: epaxos::ReadRequest) -> SingleResponse<epaxos::ReadResponse> {
