@@ -148,7 +148,7 @@ impl Replica {
             value: write_req.value,
             seq,
             dependencies: dependencies.clone(),
-            state: CommandState::PreAccepted,
+            state: CommandState::PreAccepted
         });
 
         PreAccept(Payload {
@@ -163,22 +163,39 @@ impl Replica {
     }
 
     fn replica_establish_ordering_constraints(&mut self, pre_accept_req: PreAccept) -> PreAcceptOK {
-        let dependencies = self.find_interference(&pre_accept_req.0.command.key);
-        let seq_candidate = self.find_next_seq(&dependencies);
-        let seq = cmp::max(pre_accept_req.0.seq, seq_candidate);
+        let Payload { command, seq, mut dependencies, instance } =
+            pre_accept_req.0;
+        let dependencies1 = self.find_interference(&command.key);
+        let seq_candidate = self.find_next_seq(&dependencies1);
+        let seq1 = cmp::max(seq, seq_candidate);
         let mut dep_diff = Vec::new();
-        for dep in dependencies {
+        for dep in dependencies1 {
             // FIXME contains inefficient for a vector, but it doesn't matter
-            if !pre_accept_req.0.dependencies.contains(&dep) {
+            if !dependencies.contains(&dep) {
                 dep_diff.push(dep);
             }
         }
-        // TODO add instance
+
+        // FIXME use some kind of idiom here
+        // find the union
+        for dep in &dep_diff {
+            dependencies.push(*dep)
+        }
+
+        // unlike in the paper, PreAcceptOK contains the difference, not the union
+        self.commands.0.insert(instance, Instance {
+            key: command.key.clone(),
+            value: command.value,
+            seq: seq1,
+            dependencies,
+            state: CommandState::PreAccepted
+        });
+
         PreAcceptOK(Payload {
-            command: pre_accept_req.0.command,
-            seq,
+            command,
+            seq: seq1,
             dependencies: dep_diff,
-            instance: pre_accept_req.0.instance,
+            instance
         })
     }
 
