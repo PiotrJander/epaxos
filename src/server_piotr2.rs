@@ -1,6 +1,8 @@
 use std::cmp;
+use std::collections::HashMap;
 use std::ops::Index;
 
+// FIXME maybe delete
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 struct ReplicaId(usize);
 
@@ -25,7 +27,7 @@ struct ReadResponse {
     value: i32
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct InstanceRef {
     replica: ReplicaId,
     slot: usize,
@@ -69,47 +71,35 @@ struct Instance {
 }
 
 // TODO use HashMap instead
-struct Commands(Vec<Vec<Instance>>);
+struct Commands(HashMap<InstanceRef, Instance>);
 
 impl Commands {
-
     fn new() -> Self {
-        let mut commands = Vec::new();
-        for i in 0..REPLICAS_NUM {
-            commands.push(Vec::new());
-        };
-        Commands(commands)
+        Commands(HashMap::new())
     }
 }
 
 impl std::ops::Index<InstanceRef> for Commands {
+
     type Output = Instance;
 
-    fn index(&self, ref_: InstanceRef) -> &Self::Output {
-        &self.0[ref_.replica.0][ref_.slot]
+    fn index(&self, index: InstanceRef) -> &Self::Output {
+        &self.0[&index]
     }
 }
 
 impl std::ops::IndexMut<InstanceRef> for Commands {
 
-    fn index_mut(&mut self, ref_: InstanceRef) -> &mut Self::Output {
-        &mut self.0[ref_.replica.0][ref_.slot]
+    // unsafe: requires that the key is present
+    fn index_mut(&mut self, index: InstanceRef) -> &mut Self::Output {
+        self.0.get_mut(&index).unwrap()
     }
 }
-
-// FIXME do I have to have state to implement an Iterator?
-//impl Iterator for Commands {
-//
-//    type Item = (ReplicaId, usize, Instance);
-//
-//    fn next(&mut self) -> Option<Self::Item> {
-//        unimplemented!()
-//    }
-//}
 
 struct Replica {
     id: ReplicaId,
     commands: Commands,
+    instance_number: usize,
 }
 
 enum Path {
@@ -122,7 +112,7 @@ const REPLICAS_NUM: usize = 5;
 
 impl Replica {
     fn new(id: ReplicaId) -> Replica {
-        Replica { id, commands: Commands::new() }
+        Replica { id, commands: Commands::new(), instance_number: 0 }
     }
 
     fn pre_accept_(&self, p: PreAccept) -> PreAcceptOK {
@@ -137,16 +127,23 @@ impl Replica {
         unimplemented!()
     }
 
-//    fn fast_quorum(&self) -> Vec<ReplicaId> {
+    //    fn fast_quorum(&self) -> Vec<ReplicaId> {
 //        unimplemented!()
 //    }
+
+    fn current_instance_ref(&self) -> InstanceRef {
+        InstanceRef {
+            replica: self.id,
+            slot: self.instance_number,
+        }
+    }
 
     fn leader_establish_ordering_constraints1(&mut self, write_req: WriteRequest) -> PreAccept {
 
         let dependencies = self.find_interference(&write_req.key);
         let seq = self.find_next_seq(&dependencies);
-        let instance_number = self.commands.0[self.id.0].len();
-        self.commands.0[self.id.0].push(Instance {
+        self.instance_number += 1;
+        self.commands.0.insert(self.current_instance_ref(), Instance {
             key: write_req.key.clone(),
             value: write_req.value,
             seq,
@@ -160,7 +157,7 @@ impl Replica {
             dependencies,
             instance: InstanceRef {
                 replica: self.id,
-                slot: instance_number,
+                slot: self.instance_number,
             },
         })
     }
@@ -181,7 +178,7 @@ impl Replica {
             command: pre_accept_req.0.command,
             seq,
             dependencies: dep_diff,
-            instance: pre_accept_req.0.instance
+            instance: pre_accept_req.0.instance,
         })
     }
 
@@ -190,7 +187,7 @@ impl Replica {
     fn leader_establish_ordering_constraints2(
         &mut self,
         mut pre_accept_request: PreAccept,
-        mut pre_accept_ok_responses: [PreAcceptOK; QUORUM - 1]
+        mut pre_accept_ok_responses: [PreAcceptOK; QUORUM - 1],
     ) -> Path {
         let fast_path = pre_accept_ok_responses.iter().all(|response| {
             response.0.seq == pre_accept_request.0.seq && response.0.dependencies.is_empty()
@@ -226,12 +223,10 @@ impl Replica {
     // FIXME we only record write commands - is this okay?
     // FIXME is this correct?
     fn find_interference(&self, key: &String) -> Vec<InstanceRef> {
-        let mut acc = Vec::new();
-        for (q, row) in self.commands.0.iter().enumerate() {
-            for (j, instance) in row.iter().enumerate() {
-                if instance.key == *key {
-                    acc.push(InstanceRef { replica: ReplicaId(q), slot: j })
-                }
+        let mut acc: Vec<InstanceRef> = Vec::new();
+        for (ref_, instance) in &self.commands.0 {
+            if instance.key == *key {
+                acc.push(*ref_);
             }
         }
         acc
