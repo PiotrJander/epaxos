@@ -25,7 +25,7 @@ struct ReadResponse {
     value: i32
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct InstanceRef {
     replica: ReplicaId,
     slot: usize,
@@ -68,6 +68,7 @@ struct Instance {
     state: CommandState,
 }
 
+// TODO use HashMap instead
 struct Commands(Vec<Vec<Instance>>);
 
 impl Commands {
@@ -140,7 +141,7 @@ impl Replica {
 //        unimplemented!()
 //    }
 
-    fn establish_ordering_constraints1(&mut self, write_req: WriteRequest) -> PreAccept {
+    fn leader_establish_ordering_constraints1(&mut self, write_req: WriteRequest) -> PreAccept {
 
         let dependencies = self.find_interference(&write_req.key);
         let seq = self.find_next_seq(&dependencies);
@@ -164,9 +165,29 @@ impl Replica {
         })
     }
 
+    fn replica_establish_ordering_constraints(&mut self, pre_accept_req: PreAccept) -> PreAcceptOK {
+        let dependencies = self.find_interference(&pre_accept_req.0.command.key);
+        let seq_candidate = self.find_next_seq(&dependencies);
+        let seq = cmp::max(pre_accept_req.0.seq, seq_candidate);
+        let mut dep_diff = Vec::new();
+        for dep in dependencies {
+            // FIXME contains inefficient for a vector, but it doesn't matter
+            if !pre_accept_req.0.dependencies.contains(&dep) {
+                dep_diff.push(dep);
+            }
+        }
+        // TODO add instance
+        PreAcceptOK(Payload {
+            command: pre_accept_req.0.command,
+            seq,
+            dependencies: dep_diff,
+            instance: pre_accept_req.0.instance
+        })
+    }
+
     // assume that, unlike in the paper, the `dependencies` field of a PreAcceptOkayResponse
     // contains the difference, not the union, of instance references
-    fn establish_ordering_constraints2(
+    fn leader_establish_ordering_constraints2(
         &mut self,
         mut pre_accept_request: PreAccept,
         mut pre_accept_ok_responses: [PreAcceptOK; QUORUM - 1]
@@ -189,7 +210,7 @@ impl Replica {
         }
     }
 
-    fn paxos_accept(&mut self, accept_req: Accept) -> (WriteResponse, Commit) {
+    fn leader_commit(&mut self, accept_req: Accept) -> (WriteResponse, Commit) {
         self.commands[accept_req.0.instance].state = CommandState::Committed;
         (WriteResponse { committed: true }, Commit(accept_req.0))
     }
@@ -216,8 +237,7 @@ impl Replica {
         acc
     }
 
-    // FIXME we don't want a `&mut` self reference here
-    fn find_next_seq(&mut self, deps: &Vec<InstanceRef>) -> usize {
+    fn find_next_seq(&self, deps: &Vec<InstanceRef>) -> usize {
         let mut acc = 0;
         for dep in deps {
             let instance = &self.commands[*dep];
