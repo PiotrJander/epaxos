@@ -22,7 +22,7 @@ use std::sync::MutexGuard;
 
 const QUORUM: usize = 3;
 const REPLICAS_NUM: usize = 5;
-const LOCALHOST: &str = "localhost";
+const LOCALHOST: &str = "127.0.0.1";
 static REPLICA_INTERNAL_PORTS: &'static [u16] = &[10000, 10001, 10002, 10003, 10004];
 static REPLICA_EXTERNAL_PORTS: &'static [u16] = &[10010, 10011, 10012, 10013, 10014];
 
@@ -122,7 +122,7 @@ fn start_server(service: ServerServiceDefinition, port: u16) -> () {
     println!("Server started on address {}", server.local_addr());
 }
 
-fn main() {
+pub fn main_() {
     let args: Vec<String> = env::args().collect();
 
     let id: usize = args[1].parse().unwrap();
