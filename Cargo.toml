@@ -10,8 +10,8 @@ edition = "2018"
 grpc            = "0.6.1"
 protobuf        = "~2"
 protoc-rust = "2.8.1"
-futures         = "0.3.1"
-futures-cpupool = "~0.1"
+futures         = "0.1.*"
+futures-cpupool = "0.1.*"
 
 [build-dependencies]
 protoc-rust-grpc = "0.6.1"

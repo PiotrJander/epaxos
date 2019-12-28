@@ -2,8 +2,8 @@ use crate::logic::*;
 use crate::epaxos;
 
 impl WriteRequest {
-    pub fn from_grpc(req: epaxos::WriteRequest) -> Self {
-        WriteRequest { key: req.key, value: req.value }
+    pub fn from_grpc(req: &epaxos::WriteRequest) -> Self {
+        WriteRequest { key: req.key.clone(), value: req.value }
     }
 
     pub fn to_grpc(&self) -> epaxos::WriteRequest {
@@ -12,7 +12,7 @@ impl WriteRequest {
 }
 
 impl WriteResponse {
-    pub fn from_grpc(req: epaxos::ReadResponse) -> Self {
+    pub fn from_grpc(req: &epaxos::ReadResponse) -> Self {
         unimplemented!()
     }
 
@@ -24,7 +24,7 @@ impl WriteResponse {
 }
 
 impl ReadRequest {
-    pub fn from_grpc(req: epaxos::ReadRequest) -> Self {
+    pub fn from_grpc(req: &epaxos::ReadRequest) -> Self {
         unimplemented!()
     }
 
@@ -34,7 +34,7 @@ impl ReadRequest {
 }
 
 impl ReadResponse {
-    pub fn from_grpc(req: epaxos::ReadResponse) -> Self {
+    pub fn from_grpc(req: &epaxos::ReadResponse) -> Self {
         unimplemented!()
     }
 
@@ -44,7 +44,7 @@ impl ReadResponse {
 }
 
 impl InstanceRef {
-    pub fn from_grpc(ref_: epaxos::Instance) -> Self {
+    pub fn from_grpc(ref_: &epaxos::Instance) -> Self {
         unimplemented!()
     }
 
@@ -54,7 +54,7 @@ impl InstanceRef {
 }
 
 impl Payload {
-    pub fn from_grpc(p: epaxos::Payload) -> Self {
+    pub fn from_grpc(p: &epaxos::Payload) -> Self {
         unimplemented!()
     }
 
@@ -64,7 +64,7 @@ impl Payload {
 }
 
 impl AcceptOK {
-    pub fn from_grpc(resp: epaxos::AcceptOKPayload) -> Self {
+    pub fn from_grpc(resp: &epaxos::AcceptOKPayload) -> Self {
         unimplemented!()
     }
 

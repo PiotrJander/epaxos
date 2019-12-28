@@ -3,6 +3,9 @@ extern crate futures_cpupool;
 extern crate grpc;
 extern crate protobuf;
 
+use futures::prelude::*;
+use futures::future::join_all;
+
 use crate::epaxos_grpc::*;
 use grpc::{ClientStub, RequestOptions, SingleResponse};
 use std::{
@@ -61,21 +64,21 @@ impl Server {
 impl Internal for Server {
     fn pre_accept(&self, o: RequestOptions, p: epaxos::Payload) -> SingleResponse<epaxos::Payload> {
         let mut replica = self.replica.lock().unwrap();
-        let request = PreAccept(Payload::from_grpc(p));
+        let request = PreAccept(Payload::from_grpc(&p));
         let response = replica.pre_accept_(request);
         grpc::SingleResponse::completed(response.0.to_grpc())
     }
 
     fn accept(&self, o: RequestOptions, p: epaxos::Payload) -> SingleResponse<epaxos::AcceptOKPayload> {
         let mut replica = self.replica.lock().unwrap();
-        let request = Accept(Payload::from_grpc(p));
+        let request = Accept(Payload::from_grpc(&p));
         let response = replica.accept_(request);
         grpc::SingleResponse::completed(response.to_grpc())
     }
 
     fn commit(&self, o: RequestOptions, p: epaxos::Payload) -> SingleResponse<epaxos::Empty> {
         let mut replica = self.replica.lock().unwrap();
-        let request = Commit(Payload::from_grpc(p));
+        let request = Commit(Payload::from_grpc(&p));
         replica.commit_(request);
         grpc::SingleResponse::completed(epaxos::Empty::new())
     }
@@ -86,16 +89,17 @@ impl External for Server {
     fn write(&self, o: RequestOptions, p: epaxos::WriteRequest) -> SingleResponse<epaxos::WriteResponse> {
         let mut replica = self.replica.lock().unwrap();
         let mut internal_clients = self.internal_clients.lock().unwrap();
-        let request = WriteRequest::from_grpc(p);
+        let request = WriteRequest::from_grpc(&p);
         let pre_accept_request = replica.write1(request);
 
-        // make pre_accept requests
-        let mut pre_accept_responses = Vec::new();
-        for (i, id) in self.fast_quorum().iter().enumerate() {
-            let single_response = internal_clients[id].pre_accept(RequestOptions::new(), pre_accept_request.0.to_grpc());
-            let response = unimplemented!();  // TODO how to deal with futures in rust
-            pre_accept_responses.push(response)
-        }
+        // make pre_accept requests in parallel
+        let quorum = self.fast_quorum();
+        let eventual_responses = quorum.iter().map(|id| {
+            internal_clients[id].pre_accept(RequestOptions::new(), pre_accept_request.0.to_grpc()).drop_metadata()
+        });
+        let pre_accept_responses_grpc = join_all(eventual_responses).wait().unwrap(); // the parallel bit
+        let pre_accept_responses: Vec<PreAcceptOK> =
+            pre_accept_responses_grpc.iter().map(|resp| PreAcceptOK(Payload::from_grpc(resp))).collect();
 
         let (write_resp, commit_req) = match replica.write2(pre_accept_request, pre_accept_responses) {
             Path::Fast(write_resp, commit_req) => (write_resp, commit_req),
